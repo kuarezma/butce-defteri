@@ -1,0 +1,16 @@
+{
+  "name": "butce-defteri",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Aylık gelir gider takibi — iOS ana ekranına eklenebilen PWA.",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "devDependencies": {
+    "vite": "^8.2.1",
+    "vite-plugin-pwa": "^1.3.0"
+  }
+}

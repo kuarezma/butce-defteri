@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="tr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="description" content="Aylık gelir gider takibi: kategori kırılımı, tekrarlayan işlemler, bütçe limitleri." />
+    <meta name="theme-color" content="#0a0b0f" />
+
+    <!-- iOS ana ekrana ekleme -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Bütçe" />
+    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+
+    <link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="/icons/favicon-16.png" />
+
+    <title>Bütçe Defteri</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@600;700&display=swap" rel="stylesheet" />
+  </head>
+  <body>
+    <div id="app">
+      <header class="page-head">
+        <h1>Bütçe <span>Defteri</span></h1>
+
+        <div class="month-nav">
+          <button type="button" class="icon-btn" id="prev-month" aria-label="Önceki ay">‹</button>
+          <span id="month-label" class="month-label"></span>
+          <button type="button" class="icon-btn" id="next-month" aria-label="Sonraki ay">›</button>
+        </div>
+
+        <div class="stat-row">
+          <div class="stat-tile">
+            <span class="stat-label">Gelir</span>
+            <strong class="stat-value" id="stat-income">₺0</strong>
+          </div>
+          <div class="stat-tile">
+            <span class="stat-label">Gider</span>
+            <strong class="stat-value" id="stat-expense">₺0</strong>
+          </div>
+          <div class="stat-tile" id="stat-net-tile">
+            <span class="stat-label">Net</span>
+            <strong class="stat-value" id="stat-net">₺0</strong>
+          </div>
+        </div>
+
+        <p class="avg-line" id="avg-line"></p>
+      </header>
+
+      <main class="dashboard" id="dashboard">
+        <!-- İşlem ekle -->
+        <section class="card">
+          <div class="card-head"><h2>İşlem Ekle</h2></div>
+          <form id="tx-form" class="tx-form">
+            <div class="segmented" role="radiogroup" aria-label="İşlem türü">
+              <button type="button" class="seg-btn is-active" data-type="expense" role="radio" aria-checked="true">Gider</button>
+              <button type="button" class="seg-btn" data-type="income" role="radio" aria-checked="false">Gelir</button>
+            </div>
+            <input type="hidden" name="type" id="tx-type" value="expense" />
+
+            <div class="field-row">
+              <label class="field">
+                <span>Tutar (₺)</span>
+                <input type="number" name="amount" inputmode="decimal" step="0.01" min="0.01" required />
+              </label>
+              <label class="field">
+                <span>Tarih</span>
+                <input type="date" name="date" required />
+              </label>
+            </div>
+
+            <label class="field">
+              <span>Kategori</span>
+              <select name="categoryId" id="tx-category" required></select>
+            </label>
+
+            <label class="field">
+              <span>Not (opsiyonel)</span>
+              <input type="text" name="note" maxlength="120" placeholder="ör. hafta sonu market" />
+            </label>
+
+            <button type="submit" class="btn btn-primary btn-block">Ekle</button>
+          </form>
+        </section>
+
+        <!-- İşlem listesi -->
+        <section class="card" id="tx-list-card">
+          <div class="card-head">
+            <h2>Bu Ayın İşlemleri</h2>
+            <span class="badge" id="tx-count-badge">0 işlem</span>
+          </div>
+          <ul class="tx-list" id="tx-list"></ul>
+        </section>
+
+        <!-- Kategori dağılımı -->
+        <section class="card wide">
+          <div class="card-head">
+            <h2>Kategori Dağılımı</h2>
+            <div class="segmented segmented-sm" role="radiogroup" aria-label="Grafik türü">
+              <button type="button" class="seg-btn is-active" data-chart-type="expense" role="radio" aria-checked="true">Gider</button>
+              <button type="button" class="seg-btn" data-chart-type="income" role="radio" aria-checked="false">Gelir</button>
+            </div>
+          </div>
+          <div id="category-chart" class="chart-host"></div>
+        </section>
+
+        <!-- Trend -->
+        <section class="card wide">
+          <div class="card-head">
+            <h2>Aylık Trend</h2>
+            <div class="legend">
+              <span class="legend-item"><i style="background:var(--series-blue)"></i>Gelir</span>
+              <span class="legend-item"><i style="background:var(--series-orange)"></i>Gider</span>
+            </div>
+          </div>
+          <div id="trend-chart" class="chart-host"></div>
+        </section>
+
+        <!-- Bütçe limitleri -->
+        <section class="card wide">
+          <div class="card-head"><h2>Bütçe Limitleri</h2></div>
+          <p class="card-desc">Kategoriye aylık limit koy; %70'te uyarı, %90'da ciddi, %100'de kritik renk alır.</p>
+          <ul class="budget-list" id="budget-list"></ul>
+          <form id="budget-form" class="budget-form">
+            <select name="categoryId" id="budget-category" required></select>
+            <div class="field-row">
+              <input type="number" name="limit" inputmode="decimal" step="1" min="1" placeholder="Limit (₺)" required />
+              <button type="submit" class="btn">Kaydet</button>
+            </div>
+          </form>
+        </section>
+
+        <!-- Tekrarlayan işlemler -->
+        <section class="card wide">
+          <div class="card-head"><h2>Tekrarlayan İşlemler</h2></div>
+          <p class="card-desc">Kira, maaş, abonelik gibi her ay tekrar eden işlemler — tanımladığında ilgili aya otomatik işlenir.</p>
+          <ul class="recurring-list" id="recurring-list"></ul>
+          <form id="recurring-form" class="tx-form">
+            <div class="segmented" role="radiogroup" aria-label="Tekrarlayan işlem türü">
+              <button type="button" class="seg-btn is-active" data-type="expense" role="radio" aria-checked="true">Gider</button>
+              <button type="button" class="seg-btn" data-type="income" role="radio" aria-checked="false">Gelir</button>
+            </div>
+            <input type="hidden" name="type" id="rec-type" value="expense" />
+            <label class="field">
+              <span>Ad</span>
+              <input type="text" name="name" maxlength="60" placeholder="ör. Kira" required />
+            </label>
+            <div class="field-row">
+              <label class="field">
+                <span>Tutar (₺)</span>
+                <input type="number" name="amount" inputmode="decimal" step="0.01" min="0.01" required />
+              </label>
+              <label class="field">
+                <span>Ayın günü</span>
+                <input type="number" name="day" min="1" max="28" value="1" required />
+              </label>
+            </div>
+            <label class="field">
+              <span>Kategori</span>
+              <select name="categoryId" id="rec-category" required></select>
+            </label>
+            <button type="submit" class="btn btn-block">Tekrarlayan İşlem Ekle</button>
+          </form>
+        </section>
+      </main>
+
+      <footer class="page-foot">
+        <div class="data-actions">
+          <button type="button" class="btn btn-primary" id="export-btn">Yedek al (JSON)</button>
+          <button type="button" class="btn" id="import-btn">Yedekten yükle</button>
+          <input type="file" id="import-input" accept="application/json,.json" hidden />
+          <button type="button" class="btn btn-danger" id="reset-btn">Tümünü Sıfırla</button>
+        </div>
+
+        <div class="confirm" id="reset-confirm" hidden>
+          <span>Tüm işlemler, tekrarlayanlar ve limitler silinecek. Emin misin?</span>
+          <button type="button" class="btn btn-danger" data-action="reset-yes">Evet, sıfırla</button>
+          <button type="button" class="btn" data-action="reset-no">Vazgeç</button>
+        </div>
+
+        <p class="status" id="status-line" role="status"></p>
+
+        <p class="disclaimer">
+          Veriler yalnızca bu cihazda / bu tarayıcıda saklanır. Düzenli olarak yedek al.
+          Bu araç kişisel takip amaçlıdır; muhasebe veya vergi beyanı yerine geçmez.
+        </p>
+      </footer>
+    </div>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>

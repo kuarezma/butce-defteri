@@ -1,0 +1,27 @@
+# Bağımlılıklar / derleme çıktısı
+node_modules
+dist
+dist-ssr
+*.local
+
+# PWA otomatik üretilenler
+dev-dist
+
+# Editör / sistem
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Loglar
+logs
+*.log
+npm-debug.log*
+
+# Claude Code
+.claude/
