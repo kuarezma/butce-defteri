@@ -2234,21 +2234,320 @@ dialog.wide-modal {
   color: var(--text-primary);
 }
 
-/* ---------- iPhone & Android Mobil Uyumluluk & Safe Area ---------- */
+/* ---------- iPhone & Android Mobil Uyumluluk & Native PWA Deneyimi ---------- */
 
-@supports (padding-top: env(safe-area-inset-top)) {
-  .page-head {
-    padding-top: calc(14px + env(safe-area-inset-top));
-  }
-  .page-foot {
-    padding-bottom: calc(24px + env(safe-area-inset-bottom));
+html {
+  height: 100%;
+  overflow-x: hidden;
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  min-height: 100%;
+  min-height: -webkit-fill-available;
+  min-height: 100dvh;
+  padding: max(16px, calc(12px + var(--safe-top))) max(12px, var(--safe-left, 0px)) max(36px, calc(20px + var(--safe-bottom))) max(12px, var(--safe-right, 0px));
+  overscroll-behavior-y: contain;
+  overflow-x: hidden;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Dokunmatik UI Etkileşimlerinde İstenmeyen Metin Seçimini Engelleme */
+.tab-btn, .icon-btn, .btn, .seg-btn, .chip-btn, .brand-badge, .stat-tile, .tool-tile, .month-nav {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+
+/* Dokunmatik hedefler Apple & Android standartlarına uygun (en az 44x44px) */
+.icon-btn {
+  width: 42px;
+  height: 42px;
+  min-width: 42px;
+  min-height: 42px;
+  touch-action: manipulation;
+}
+
+.btn {
+  min-height: 44px;
+  padding: 11px 18px;
+  touch-action: manipulation;
+}
+
+.tab-btn {
+  min-height: 42px;
+  padding: 8px 12px;
+  touch-action: manipulation;
+}
+
+.seg-btn {
+  min-height: 40px;
+  padding: 8px 16px;
+  touch-action: manipulation;
+}
+
+.chip-btn {
+  min-height: 38px;
+  padding: 8px 14px;
+  touch-action: manipulation;
+}
+
+.row-edit, .row-delete {
+  width: 36px;
+  height: 36px;
+  min-width: 36px;
+  min-height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  touch-action: manipulation;
+}
+
+.close-btn {
+  width: 40px;
+  height: 40px;
+  min-width: 40px;
+  min-height: 40px;
+}
+
+/* iOS Safari Input Otomatik Zoom (Yakınlaştırma) Engelleme */
+@media (max-width: 768px) {
+  input[type="text"],
+  input[type="number"],
+  input[type="date"],
+  input[type="month"],
+  input[type="password"],
+  input[type="search"],
+  select,
+  textarea {
+    font-size: 16px !important;
   }
 }
 
-/* Dokunmatik hedefler iOS / Android için en az 44px */
-.icon-btn, .btn, .seg-btn {
-  min-height: 40px;
-  touch-action: manipulation;
+/* Modal Pencerelerin Mobil Ekran ve Klavye ile Taşmasını Önleme */
+dialog.glass-modal {
+  max-height: 90vh;
+  max-height: 90dvh;
+  width: calc(100% - 24px);
+  max-width: 480px;
+  margin: auto;
+  overflow: hidden;
+}
+
+dialog.wide-modal {
+  max-width: 620px;
+}
+
+.modal-content {
+  max-height: calc(90vh - 16px);
+  max-height: calc(90dvh - 16px);
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: 20px 18px;
+}
+
+/* Mobil Ekran Düzenleri (Kayma ve Taşmaları Önleme) */
+@media (max-width: 480px) {
+  #app {
+    gap: 16px;
+  }
+
+  h1 {
+    font-size: 1.85rem;
+  }
+
+  .brand-badge {
+    font-size: 0.74rem;
+    padding: 4px 10px;
+  }
+
+  .header-actions {
+    gap: 6px;
+  }
+
+  .icon-btn {
+    width: 38px;
+    height: 38px;
+    min-width: 38px;
+    min-height: 38px;
+  }
+
+  .month-nav {
+    padding: 4px 12px;
+    gap: 10px;
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .month-label {
+    font-size: 1rem;
+    min-width: 110px;
+  }
+
+  .stat-row {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+  }
+
+  .stat-tile {
+    padding: 10px 12px 12px;
+    border-radius: var(--radius-sm);
+  }
+
+  .stat-value {
+    font-size: 1.12rem;
+  }
+
+  .stat-label {
+    font-size: 0.72rem;
+  }
+
+  .main-tabs {
+    padding: 3px;
+    gap: 3px;
+  }
+
+  .tab-btn {
+    padding: 8px 10px;
+    font-size: 0.8rem;
+    gap: 4px;
+  }
+
+  .tab-btn .tab-icon {
+    font-size: 0.9rem;
+  }
+
+  .glass-card {
+    padding: 16px 14px;
+    border-radius: var(--radius);
+  }
+
+  .card-head h2 {
+    font-size: 1.05rem;
+  }
+
+  .field-row {
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .field-row-3 {
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .field-row-3 .field {
+    max-width: 100% !important;
+    width: 100% !important;
+  }
+
+  .amount-chips {
+    gap: 5px;
+  }
+
+  .chip-btn {
+    flex: 1;
+    min-width: calc(20% - 4px);
+    text-align: center;
+    padding: 8px 4px;
+    font-size: 0.78rem;
+  }
+
+  .list-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+
+  .segmented-xs {
+    width: 100%;
+    display: flex;
+  }
+
+  .segmented-xs .seg-btn {
+    flex: 1;
+    text-align: center;
+    padding: 6px 4px;
+  }
+
+  .tx-row, .rec-row {
+    padding: 10px 10px;
+    gap: 8px;
+  }
+
+  .tx-icon {
+    width: 36px;
+    height: 36px;
+    min-width: 36px;
+    font-size: 1.1rem;
+  }
+
+  .tx-main {
+    min-width: 0;
+    flex: 1;
+  }
+
+  .tx-title {
+    font-size: 0.86rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .tx-sub {
+    font-size: 0.72rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .tx-amount {
+    font-size: 0.92rem;
+    white-space: nowrap;
+  }
+
+  .tools-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .data-actions-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .ftt-grid {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .annual-stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+/* Küçük Ekranlar (iPhone SE / 360px) */
+@media (max-width: 360px) {
+  body {
+    padding-left: 8px;
+    padding-right: 8px;
+  }
+
+  h1 {
+    font-size: 1.65rem;
+  }
+
+  .tab-btn {
+    font-size: 0.74rem;
+    padding: 7px 6px;
+  }
+
+  .tab-btn span:not(.tab-icon) {
+    font-size: 0.74rem;
+  }
+
+  .stat-value {
+    font-size: 1.02rem;
+  }
 }
 
 /* ---------- Yazdır / PDF Görünümü (@media print) ---------- */
@@ -2260,9 +2559,13 @@ dialog.wide-modal {
   }
 
   .ambient-glow, .header-actions, .quick-entry-card, .tx-form, .budget-form, .recurring-form,
-  .amount-chips, .data-actions, .disclaimer, .row-actions, .confirm, #reset-confirm,
-  .pin-lock-overlay, button {
+  .amount-chips, .data-actions-grid, .disclaimer-card, .row-actions, .confirm, #reset-confirm,
+  .pin-lock-overlay, button, .main-tabs {
     display: none !important;
+  }
+
+  .tab-pane {
+    display: flex !important;
   }
 
   .glass-card, .card {
