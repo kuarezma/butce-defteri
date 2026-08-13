@@ -20,7 +20,7 @@ export function categoryBreakdown(state, period, type, cap = CATEGORY_CHART_CAP)
   for (const t of txs) sums.set(t.categoryId, (sums.get(t.categoryId) || 0) + t.amount);
 
   const rows = [...sums.entries()]
-    .map(([categoryId, amount]) => ({ categoryId, category: categoryById(categoryId), amount }))
+    .map(([categoryId, amount]) => ({ categoryId, category: categoryById(categoryId, state.customCategories), amount }))
     .sort((a, b) => b.amount - a.amount);
 
   if (rows.length <= cap) return rows;
@@ -55,7 +55,7 @@ export function budgetStatus(state, period) {
     if (percent >= 100) severity = 'critical';
     else if (percent >= 90) severity = 'serious';
     else if (percent >= 70) severity = 'warning';
-    return { categoryId, category: categoryById(categoryId), limit, used, percent, severity };
+    return { categoryId, category: categoryById(categoryId, state.customCategories), limit, used, percent, severity };
   });
 
   return rows.sort((a, b) => b.percent - a.percent);
@@ -111,7 +111,7 @@ export function categoryComparison(state, currentPeriod, type = 'expense') {
     const diffPercent = prev > 0 ? Math.round((diff / prev) * 100) : cur > 0 ? 100 : 0;
     rows.push({
       categoryId,
-      category: categoryById(categoryId) || { id: categoryId, name: 'Diğer', icon: '🔹' },
+      category: categoryById(categoryId, state.customCategories) || { id: categoryId, name: 'Diğer', icon: '🔹' },
       currentAmount: cur,
       prevAmount: prev,
       diff,
@@ -120,4 +120,69 @@ export function categoryComparison(state, currentPeriod, type = 'expense') {
   }
 
   return rows.sort((a, b) => b.currentAmount - a.currentAmount);
+}
+
+/**
+ * 50/30/20 Kural Analizi:
+ * İhtiyaçlar (%50), İstekler (%30), Tasarruf (%20).
+ */
+export function computeFiftyThirtyTwenty(state, period) {
+  const totals = monthTotals(state, period);
+  const txs = transactionsInMonth(state, period).filter((t) => t.type === 'expense');
+
+  let needsAmount = 0;
+  let wantsAmount = 0;
+
+  for (const t of txs) {
+    const cat = categoryById(t.categoryId, state.customCategories);
+    if (cat && cat.bucket === 'needs') {
+      needsAmount += t.amount;
+    } else {
+      wantsAmount += t.amount;
+    }
+  }
+
+  const netSavings = Math.max(totals.net, 0);
+  const base = totals.income > 0 ? totals.income : (needsAmount + wantsAmount);
+
+  const needsPct = base > 0 ? Math.round((needsAmount / base) * 100) : 0;
+  const wantsPct = base > 0 ? Math.round((wantsAmount / base) * 100) : 0;
+  const savingsPct = totals.income > 0 ? Math.round((netSavings / totals.income) * 100) : 0;
+
+  let evaluation = '';
+  let statusTone = 'info';
+
+  if (totals.income <= 0) {
+    evaluation = '50/30/20 analizi için bu aya gelir işlemi ekleyin.';
+    statusTone = 'neutral';
+  } else if (totals.net < 0) {
+    evaluation = 'Bu ay giderler geliri aşıyor. Bütçe açığını kapatmak için istek harcamalarını kısabilirsiniz.';
+    statusTone = 'critical';
+  } else if (needsPct <= 55 && wantsPct <= 35 && savingsPct >= 15) {
+    evaluation = 'Harika bütçe yönetimi! Harcamalarınız ve tasarrufunuz ideal dengede. 🌟';
+    statusTone = 'good';
+  } else if (needsPct > 55) {
+    evaluation = `Zorunlu ihtiyaç harcamaları gelirin %${needsPct}'ini kapsıyor (hedef: %50).`;
+    statusTone = 'warning';
+  } else if (wantsPct > 35) {
+    evaluation = `İstek harcamaları gelirin %${wantsPct}'ini buldu (hedef: %30).`;
+    statusTone = 'warning';
+  } else {
+    evaluation = 'Dengeli bir bütçe dağılımı mevcut.';
+    statusTone = 'good';
+  }
+
+  return {
+    income: totals.income,
+    expense: totals.expense,
+    net: totals.net,
+    needsAmount,
+    wantsAmount,
+    savingsAmount: netSavings,
+    needsPct,
+    wantsPct,
+    savingsPct,
+    evaluation,
+    statusTone,
+  };
 }

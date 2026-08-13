@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { normalize, addTransaction, setBudget } from '../src/state.js';
+import { normalize, addTransaction, setBudget, addCustomCategory } from '../src/state.js';
 import {
   monthTotals,
   categoryBreakdown,
@@ -8,6 +8,7 @@ import {
   trailingAverageExpense,
   savingsRate,
   categoryComparison,
+  computeFiftyThirtyTwenty,
 } from '../src/compute.js';
 
 describe('compute.js unit tests', () => {
@@ -81,5 +82,23 @@ describe('compute.js unit tests', () => {
     expect(market.prevAmount).toBe(2000);
     expect(market.diff).toBe(2000);
     expect(market.diffPercent).toBe(100);
+  });
+
+  it('computeFiftyThirtyTwenty correctly breaks down needs, wants and savings', () => {
+    const s = normalize({});
+    addTransaction(s, { type: 'income', amount: 10000, categoryId: 'gelir-maas', date: '2026-08-01' });
+    addTransaction(s, { type: 'expense', amount: 5000, categoryId: 'gider-konut', date: '2026-08-02' }); // needs (50%)
+    addTransaction(s, { type: 'expense', amount: 3000, categoryId: 'gider-eglence', date: '2026-08-03' }); // wants (30%)
+
+    const custom = addCustomCategory(s, { type: 'expense', name: 'Hobi', icon: '🎨', bucket: 'wants' });
+    addTransaction(s, { type: 'expense', amount: 500, categoryId: custom.id, date: '2026-08-04' }); // wants (+5%)
+
+    const ftt = computeFiftyThirtyTwenty(s, '2026-08');
+    expect(ftt.needsAmount).toBe(5000);
+    expect(ftt.wantsAmount).toBe(3500);
+    expect(ftt.savingsAmount).toBe(1500); // 10000 - 8500
+    expect(ftt.needsPct).toBe(50);
+    expect(ftt.wantsPct).toBe(35);
+    expect(ftt.savingsPct).toBe(15);
   });
 });

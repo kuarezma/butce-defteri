@@ -10,10 +10,10 @@ function escapeCsv(val) {
   return `"${str}"`;
 }
 
-export function transactionsToCsv(transactions) {
+export function transactionsToCsv(transactions, customCategories = []) {
   const headers = ['ID', 'Tarih', 'Tür', 'Kategori', 'Tutar (TL)', 'Açıklama', 'Tekrarlayan mı?', 'Kayıt Zamanı'];
   const rows = transactions.map((t) => {
-    const cat = categoryById(t.categoryId);
+    const cat = categoryById(t.categoryId, customCategories);
     const catName = cat ? cat.name : t.categoryId;
     const typeStr = t.type === 'income' ? 'Gelir' : 'Gider';
     const isRecStr = t.recurringId ? 'Evet' : 'Hayır';

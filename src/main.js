@@ -3,18 +3,21 @@ import {
   load, save, normalize, serialize,
   addTransaction, removeTransaction, updateTransaction, transactionsInMonth,
   addRecurring, removeRecurring, updateRecurring, setRecurringActive, materializeRecurring,
-  setBudget,
+  setBudget, addCustomCategory, removeCustomCategory,
   periodKey, shiftPeriod,
 } from './state.js';
 import {
   monthTotals, categoryBreakdown, trendSeries, budgetStatus, trailingAverageExpense, savingsRate,
+  computeFiftyThirtyTwenty,
 } from './compute.js';
 import {
   fillCategorySelect, fillBudgetCategorySelect,
   renderStats, renderTransactionList, renderCategoryChart, renderTrendChart,
-  renderBudgetList, renderRecurringList, monthLabel,
+  renderBudgetList, renderRecurringList, renderFiftyThirtyTwenty, renderCustomCategoryList,
+  monthLabel, setPrivacyMode, isPrivacyMode,
 } from './render.js';
 import { transactionsToCsv, downloadCsv } from './export.js';
+import { getIcon } from './icons.js';
 
 const state = load();
 let currentPeriod = periodKey();
@@ -24,6 +27,41 @@ let txTypeFilter = 'all';
 
 // Ay açılınca o aya tanımlı tekrarlayanları işle (idempotent).
 if (materializeRecurring(state, currentPeriod) > 0) save(state);
+
+// ---------- Tema ve Gizlilik Modu Başlatma ----------
+
+const THEME_KEY = 'butceDefteri.theme';
+const PRIVACY_KEY = 'butceDefteri.privacy';
+
+let currentTheme = localStorage.getItem(THEME_KEY) || 'system';
+let privacyActive = localStorage.getItem(PRIVACY_KEY) === 'true';
+
+setPrivacyMode(privacyActive);
+applyTheme(currentTheme);
+
+function applyTheme(theme) {
+  currentTheme = theme;
+  if (theme === 'light' || theme === 'dark') {
+    document.documentElement.dataset.theme = theme;
+  } else {
+    delete document.documentElement.dataset.theme;
+  }
+  localStorage.setItem(THEME_KEY, theme);
+  updateThemeIcon();
+}
+
+function updateThemeIcon() {
+  const host = document.getElementById('theme-icon');
+  if (!host) return;
+  const isDark = currentTheme === 'dark' || (currentTheme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+  host.innerHTML = isDark ? getIcon('sun') : getIcon('moon');
+}
+
+function updatePrivacyIcon() {
+  const host = document.getElementById('privacy-icon');
+  if (!host) return;
+  host.innerHTML = isPrivacyMode() ? getIcon('eyeOff') : getIcon('eye');
+}
 
 const els = {
   monthLabel: document.getElementById('month-label'),
@@ -37,9 +75,14 @@ const els = {
   savingsTile: document.getElementById('stat-savings-tile'),
   avgLine: document.getElementById('avg-line'),
 
+  themeToggleBtn: document.getElementById('theme-toggle-btn'),
+  privacyToggleBtn: document.getElementById('privacy-toggle-btn'),
+  customCatBtn: document.getElementById('custom-cat-btn'),
+
   txForm: document.getElementById('tx-form'),
   txType: document.getElementById('tx-type'),
   txCategory: document.getElementById('tx-category'),
+  txAmountInput: document.getElementById('tx-amount-input'),
   txList: document.getElementById('tx-list'),
   txCountBadge: document.getElementById('tx-count-badge'),
   txSearchInput: document.getElementById('tx-search-input'),
@@ -47,6 +90,7 @@ const els = {
 
   categoryChartHost: document.getElementById('category-chart'),
   trendChartHost: document.getElementById('trend-chart'),
+  fttHost: document.getElementById('ftt-host'),
 
   budgetList: document.getElementById('budget-list'),
   budgetForm: document.getElementById('budget-form'),
@@ -79,6 +123,17 @@ const els = {
   editRecCategory: document.getElementById('edit-rec-category'),
   closeEditRec: document.getElementById('close-edit-rec'),
   cancelEditRec: document.getElementById('cancel-edit-rec'),
+
+  // Custom Categories Modal
+  customCatDialog: document.getElementById('custom-cat-dialog'),
+  customCatForm: document.getElementById('custom-cat-form'),
+  customCatType: document.getElementById('custom-cat-type'),
+  customCatIcon: document.getElementById('custom-cat-icon'),
+  customCatName: document.getElementById('custom-cat-name'),
+  customCatBucket: document.getElementById('custom-cat-bucket'),
+  customCatBucketField: document.getElementById('custom-cat-bucket-field'),
+  customCatList: document.getElementById('custom-cat-list'),
+  closeCustomCat: document.getElementById('close-custom-cat'),
 
   exportCsvBtn: document.getElementById('export-csv-btn'),
   exportBtn: document.getElementById('export-btn'),
@@ -133,6 +188,22 @@ function setSegmentedValue(root, hiddenInput, value) {
   });
 }
 
+// ---------- Hızlı Tutar Çipleri ----------
+
+document.querySelectorAll('.amount-chips').forEach((chipContainer) => {
+  chipContainer.addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-add]');
+    if (!btn) return;
+    const targetId = chipContainer.dataset.target;
+    const targetInput = document.getElementById(targetId);
+    if (!targetInput) return;
+    const addVal = Number(btn.dataset.add) || 0;
+    const currentVal = Number(targetInput.value) || 0;
+    targetInput.value = (currentVal + addVal).toFixed(2).replace(/\.00$/, '');
+    targetInput.focus();
+  });
+});
+
 // ---------- Ana çizim ----------
 
 function paint() {
@@ -146,6 +217,7 @@ function paint() {
   renderTransactionList(els.txList, els.txCountBadge, transactionsInMonth(state, currentPeriod), {
     search: txSearchQuery,
     filter: txTypeFilter,
+    customCategories: state.customCategories,
   });
 
   const rows = categoryBreakdown(state, currentPeriod, categoryChartType);
@@ -153,15 +225,47 @@ function paint() {
 
   renderTrendChart(els.trendChartHost, trendSeries(state, currentPeriod, 6));
 
+  const fttAnalysis = computeFiftyThirtyTwenty(state, currentPeriod);
+  renderFiftyThirtyTwenty(els.fttHost, fttAnalysis);
+
   renderBudgetList(els.budgetList, budgetStatus(state, currentPeriod));
-  renderRecurringList(els.recurringList, state.recurring);
+  renderRecurringList(els.recurringList, state.recurring, state.customCategories);
+  renderCustomCategoryList(els.customCatList, state.customCategories);
 }
 
-fillCategorySelect(els.txCategory, 'expense');
-fillCategorySelect(els.recCategory, 'expense');
-fillBudgetCategorySelect(els.budgetCategory);
+function refreshCategorySelects() {
+  fillCategorySelect(els.txCategory, els.txType.value || 'expense', state.customCategories);
+  fillCategorySelect(els.recCategory, els.recType.value || 'expense', state.customCategories);
+  fillBudgetCategorySelect(els.budgetCategory, state.customCategories);
+}
+
+refreshCategorySelects();
 els.txForm.date.value = getDefaultDateForPeriod(currentPeriod);
+updatePrivacyIcon();
+updateThemeIcon();
 paint();
+
+// ---------- Tema ve Gizlilik Butonları ----------
+
+if (els.themeToggleBtn) {
+  els.themeToggleBtn.addEventListener('click', () => {
+    const isDark = currentTheme === 'dark' || (currentTheme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+    const nextTheme = isDark ? 'light' : 'dark';
+    applyTheme(nextTheme);
+    status(nextTheme === 'dark' ? 'Koyu tema aktif.' : 'Açık tema aktif.');
+  });
+}
+
+if (els.privacyToggleBtn) {
+  els.privacyToggleBtn.addEventListener('click', () => {
+    const next = !isPrivacyMode();
+    setPrivacyMode(next);
+    localStorage.setItem(PRIVACY_KEY, String(next));
+    updatePrivacyIcon();
+    paint();
+    status(next ? 'Gizlilik modu aktif (tutarlar gizlendi).' : 'Gizlilik modu kapatıldı.');
+  });
+}
 
 // ---------- Ay gezinme ----------
 
@@ -187,6 +291,7 @@ if (els.txSearchInput) {
     renderTransactionList(els.txList, els.txCountBadge, transactionsInMonth(state, currentPeriod), {
       search: txSearchQuery,
       filter: txTypeFilter,
+      customCategories: state.customCategories,
     });
   });
 }
@@ -203,6 +308,7 @@ if (els.txFilterGroup) {
     renderTransactionList(els.txList, els.txCountBadge, transactionsInMonth(state, currentPeriod), {
       search: txSearchQuery,
       filter: txTypeFilter,
+      customCategories: state.customCategories,
     });
   });
 }
@@ -210,7 +316,7 @@ if (els.txFilterGroup) {
 // ---------- İşlem ekleme ----------
 
 wireSegmented(els.txForm.querySelector('.segmented'), els.txType, (type) => {
-  fillCategorySelect(els.txCategory, type);
+  fillCategorySelect(els.txCategory, type, state.customCategories);
 });
 
 els.txForm.addEventListener('submit', (event) => {
@@ -228,13 +334,12 @@ els.txForm.addEventListener('submit', (event) => {
     return;
   }
   persist();
-  // Eklenen işlem farklı bir aya düştüyse o aya geç.
   const addedPeriod = t.date.slice(0, 7);
   if (addedPeriod !== currentPeriod) currentPeriod = addedPeriod;
   paint();
   els.txForm.reset();
   els.txForm.date.value = getDefaultDateForPeriod(currentPeriod);
-  fillCategorySelect(els.txCategory, 'expense');
+  fillCategorySelect(els.txCategory, 'expense', state.customCategories);
   setSegmentedValue(els.txForm.querySelector('.segmented'), els.txType, 'expense');
   status('İşlem eklendi.');
 });
@@ -260,7 +365,7 @@ els.txList.addEventListener('click', (event) => {
 
     els.editTxId.value = t.id;
     setSegmentedValue(els.editTxForm.querySelector('.segmented'), els.editTxType, t.type);
-    fillCategorySelect(els.editTxCategory, t.type);
+    fillCategorySelect(els.editTxCategory, t.type, state.customCategories);
     els.editTxCategory.value = t.categoryId;
     els.editTxAmount.value = t.amount;
     els.editTxDate.value = t.date;
@@ -272,7 +377,7 @@ els.txList.addEventListener('click', (event) => {
 });
 
 wireSegmented(els.editTxForm.querySelector('.segmented'), els.editTxType, (type) => {
-  fillCategorySelect(els.editTxCategory, type);
+  fillCategorySelect(els.editTxCategory, type, state.customCategories);
 });
 
 els.closeEditTx.addEventListener('click', () => els.editTxDialog.close());
@@ -340,7 +445,7 @@ els.budgetList.addEventListener('click', (event) => {
 // ---------- Tekrarlayan işlemler ----------
 
 wireSegmented(els.recurringForm.querySelector('.segmented'), els.recType, (type) => {
-  fillCategorySelect(els.recCategory, type);
+  fillCategorySelect(els.recCategory, type, state.customCategories);
 });
 
 els.recurringForm.addEventListener('submit', (event) => {
@@ -357,13 +462,12 @@ els.recurringForm.addEventListener('submit', (event) => {
     status('Tekrarlayan işlem eklenemedi — alanları kontrol et.', 'error');
     return;
   }
-  // Şimdiki ay için de anında işlensin.
   materializeRecurring(state, currentPeriod);
   persist();
   paint();
   els.recurringForm.reset();
   els.recurringForm.day.value = '1';
-  fillCategorySelect(els.recCategory, 'expense');
+  fillCategorySelect(els.recCategory, 'expense', state.customCategories);
   setSegmentedValue(els.recurringForm.querySelector('.segmented'), els.recType, 'expense');
   status('Tekrarlayan işlem eklendi.');
 });
@@ -378,14 +482,14 @@ els.recurringList.addEventListener('click', (event) => {
   if (del) {
     removeRecurring(state, del.dataset.deleteRecurring);
     persist();
-    renderRecurringList(els.recurringList, state.recurring);
+    renderRecurringList(els.recurringList, state.recurring, state.customCategories);
     status('Tekrarlayan işlem silindi. Daha önce işlenmiş kayıtlar listede kalır.');
   } else if (toggle) {
     const r = state.recurring.find((x) => x.id === toggle.dataset.toggleRecurring);
     if (r) {
       setRecurringActive(state, r.id, !r.active);
       persist();
-      renderRecurringList(els.recurringList, state.recurring);
+      renderRecurringList(els.recurringList, state.recurring, state.customCategories);
       status(r.active ? 'Tekrarlayan işlem aktifleştirildi.' : 'Tekrarlayan işlem pasifleştirildi.');
     }
   } else if (edit) {
@@ -394,7 +498,7 @@ els.recurringList.addEventListener('click', (event) => {
 
     els.editRecId.value = r.id;
     setSegmentedValue(els.editRecForm.querySelector('.segmented'), els.editRecType, r.type);
-    fillCategorySelect(els.editRecCategory, r.type);
+    fillCategorySelect(els.editRecCategory, r.type, state.customCategories);
     els.editRecCategory.value = r.categoryId;
     els.editRecName.value = r.name;
     els.editRecAmount.value = r.amount;
@@ -406,7 +510,7 @@ els.recurringList.addEventListener('click', (event) => {
 });
 
 wireSegmented(els.editRecForm.querySelector('.segmented'), els.editRecType, (type) => {
-  fillCategorySelect(els.editRecCategory, type);
+  fillCategorySelect(els.editRecCategory, type, state.customCategories);
 });
 
 els.closeEditRec.addEventListener('click', () => els.editRecDialog.close());
@@ -435,6 +539,64 @@ els.editRecForm.addEventListener('submit', (event) => {
   status('Tekrarlayan işlem güncellendi.');
 });
 
+// ---------- Özel Kategori Yönetimi ----------
+
+if (els.customCatBtn) {
+  els.customCatBtn.addEventListener('click', () => {
+    renderCustomCategoryList(els.customCatList, state.customCategories);
+    if (els.customCatDialog.showModal) els.customCatDialog.showModal();
+    else els.customCatDialog.setAttribute('open', '');
+  });
+}
+
+if (els.closeCustomCat) {
+  els.closeCustomCat.addEventListener('click', () => els.customCatDialog.close());
+}
+
+if (els.customCatForm) {
+  wireSegmented(els.customCatForm.querySelector('.segmented'), els.customCatType, (type) => {
+    els.customCatBucketField.style.display = type === 'expense' ? 'flex' : 'none';
+  });
+
+  els.customCatForm.addEventListener('submit', (event) => {
+    event.preventDefault();
+    const form = new FormData(els.customCatForm);
+    const cat = addCustomCategory(state, {
+      type: form.get('type'),
+      name: form.get('name'),
+      icon: form.get('icon'),
+      bucket: form.get('bucket'),
+    });
+
+    if (!cat) {
+      status('Özel kategori eklenemedi — alanları kontrol et.', 'error');
+      return;
+    }
+
+    persist();
+    refreshCategorySelects();
+    paint();
+    renderCustomCategoryList(els.customCatList, state.customCategories);
+    els.customCatForm.reset();
+    els.customCatIcon.value = '🏷️';
+    status(`"${cat.name}" özel kategorisi eklendi.`);
+  });
+}
+
+if (els.customCatList) {
+  els.customCatList.addEventListener('click', (event) => {
+    const btn = event.target.closest('[data-delete-custom-cat]');
+    if (!btn) return;
+    const id = btn.dataset.deleteCustomCat;
+    removeCustomCategory(state, id);
+    persist();
+    refreshCategorySelects();
+    paint();
+    renderCustomCategoryList(els.customCatList, state.customCategories);
+    status('Özel kategori silindi.');
+  });
+}
+
 // ---------- CSV Dışa Aktarma ----------
 
 if (els.exportCsvBtn) {
@@ -444,8 +606,8 @@ if (els.exportCsvBtn) {
       return;
     }
     const stamp = new Date().toISOString().slice(0, 10);
-    const csvData = transactionsToCsv(state.transactions);
-    downloadCsv(csvData, `butce-defteri-${stamp}.csv`);
+    const csvData = transactionsToCsv(state.transactions, state.customCategories);
+    downloadCsv(csvData, `butce-islemleri-${stamp}.csv`);
     status('İşlemler Excel/CSV olarak indirildi.');
   });
 }
@@ -478,6 +640,7 @@ els.importInput.addEventListener('change', async () => {
     const incoming = normalize(parsed);
     Object.assign(state, incoming);
     persist();
+    refreshCategorySelects();
     paint();
     status(`Yedek yüklendi · ${state.transactions.length} işlem.`);
   } catch {
@@ -497,9 +660,11 @@ els.resetConfirm.addEventListener('click', (event) => {
   if (action === 'reset-yes') {
     state.transactions = [];
     state.recurring = [];
+    state.customCategories = [];
     state.budgets = {};
     state.materialized = {};
     persist();
+    refreshCategorySelects();
     paint();
     status('Tüm veriler sıfırlandı.');
   }

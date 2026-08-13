@@ -20,6 +20,7 @@ function emptyState() {
     schema: SCHEMA,
     transactions: [],
     recurring: [],
+    customCategories: [], // [{ id, type, name, icon, bucket, active }]
     budgets: {}, // { [categoryId]: monthlyLimit }
     materialized: {}, // { "YYYY-MM": [recurringId, ...] }
     createdAt: now,
@@ -43,6 +44,21 @@ function parseJson(raw) {
   } catch {
     return null;
   }
+}
+
+function normalizeCustomCategory(c) {
+  if (!c || typeof c !== 'object') return null;
+  if (typeof c.name !== 'string' || !c.name.trim()) return null;
+  if (c.type !== 'income' && c.type !== 'expense') return null;
+  const bucket = c.type === 'income' ? 'income' : (c.bucket === 'needs' ? 'needs' : 'wants');
+  return {
+    id: typeof c.id === 'string' && c.id ? c.id : `custom-${uid()}`,
+    name: c.name.trim(),
+    type: c.type,
+    icon: typeof c.icon === 'string' && c.icon.trim() ? c.icon.trim() : '🏷️',
+    bucket,
+    active: c.active !== false,
+  };
 }
 
 function normalizeTransaction(t) {
@@ -97,6 +113,10 @@ export function normalize(input) {
     ? input.recurring.map(normalizeRecurring).filter(Boolean)
     : [];
 
+  const customCategories = Array.isArray(input.customCategories)
+    ? input.customCategories.map(normalizeCustomCategory).filter(Boolean)
+    : [];
+
   const budgets = {};
   if (input.budgets && typeof input.budgets === 'object') {
     for (const [categoryId, limit] of Object.entries(input.budgets)) {
@@ -118,6 +138,7 @@ export function normalize(input) {
     schema: SCHEMA,
     transactions,
     recurring,
+    customCategories,
     budgets,
     materialized,
     createdAt: typeof input.createdAt === 'string' ? input.createdAt : base.createdAt,
@@ -232,12 +253,39 @@ export function materializeRecurring(state, periodKey) {
   return added;
 }
 
-// ---------- Bütçe limitleri ----------
-
 export function setBudget(state, categoryId, limit) {
   const n = Number(limit);
   if (Number.isFinite(n) && n > 0) state.budgets[categoryId] = n;
   else delete state.budgets[categoryId];
+}
+
+// ---------- Özel Kategoriler ----------
+
+export function addCustomCategory(state, input) {
+  const c = normalizeCustomCategory({ ...input, id: `custom-${uid()}` });
+  if (!c) return null;
+  if (!state.customCategories) state.customCategories = [];
+  state.customCategories.push(c);
+  return c;
+}
+
+export function removeCustomCategory(state, id) {
+  if (!state.customCategories) return false;
+  const idx = state.customCategories.findIndex((c) => c.id === id);
+  if (idx === -1) return false;
+  state.customCategories.splice(idx, 1);
+  return true;
+}
+
+export function updateCustomCategory(state, id, updates) {
+  if (!state.customCategories) return null;
+  const c = state.customCategories.find((cat) => cat.id === id);
+  if (!c) return null;
+  const merged = { ...c, ...updates, id: c.id };
+  const normalized = normalizeCustomCategory(merged);
+  if (!normalized) return null;
+  Object.assign(c, normalized);
+  return c;
 }
 
 export function serialize(state) {

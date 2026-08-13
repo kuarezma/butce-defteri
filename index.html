@@ -27,10 +27,25 @@
 
     <div id="app">
       <header class="page-head">
-        <div class="brand-badge">
-          <span class="sparkle-icon"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/></svg></span>
-          <span>Akıllı Finans Takibi</span>
+        <div class="top-bar">
+          <div class="brand-badge">
+            <span class="sparkle-icon"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/></svg></span>
+            <span>Akıllı Finans Takibi</span>
+          </div>
+
+          <div class="header-actions">
+            <button type="button" class="icon-btn" id="privacy-toggle-btn" aria-label="Gizlilik Modu" title="Bakiyeleri Gizle/Göster">
+              <span id="privacy-icon"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg></span>
+            </button>
+            <button type="button" class="icon-btn" id="custom-cat-btn" aria-label="Özel Kategoriler" title="Özel Kategori Ekle/Yönet">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2H2v10l9.29 9.29c.94.94 2.48.94 3.42 0l6.58-6.58c.94-.94.94-2.48 0-3.42L12 2Z"/><path d="M7 7h.01"/></svg>
+            </button>
+            <button type="button" class="icon-btn" id="theme-toggle-btn" aria-label="Tema Değiştir" title="Açık/Koyu Tema">
+              <span id="theme-icon"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg></span>
+            </button>
+          </div>
         </div>
+
         <h1>Bütçe <span>Defteri</span></h1>
 
         <div class="month-nav">
@@ -110,12 +125,21 @@
             <div class="field-row">
               <label class="field">
                 <span>Tutar (₺)</span>
-                <input type="number" name="amount" inputmode="decimal" step="0.01" min="0.01" placeholder="0.00" required />
+                <input type="number" name="amount" id="tx-amount-input" inputmode="decimal" step="0.01" min="0.01" placeholder="0.00" required />
               </label>
               <label class="field">
                 <span>Tarih</span>
                 <input type="date" name="date" required />
               </label>
+            </div>
+
+            <!-- Hızlı Tutar Çipleri -->
+            <div class="amount-chips" data-target="tx-amount-input">
+              <button type="button" class="chip-btn" data-add="50">+50</button>
+              <button type="button" class="chip-btn" data-add="100">+100</button>
+              <button type="button" class="chip-btn" data-add="250">+250</button>
+              <button type="button" class="chip-btn" data-add="500">+500</button>
+              <button type="button" class="chip-btn" data-add="1000">+1.000</button>
             </div>
 
             <label class="field">
@@ -190,6 +214,18 @@
             </div>
           </div>
           <div id="trend-chart" class="chart-host"></div>
+        </section>
+
+        <!-- 50/30/20 Kuralı ve Bütçe Dengesi -->
+        <section class="card glass-card wide" id="ftt-card-section">
+          <div class="card-head">
+            <h2>
+              <span class="card-head-icon"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"/></svg></span>
+              50/30/20 Bütçe Dengesi & İçgörüler
+            </h2>
+          </div>
+          <p class="card-desc">İdeal bütçe kuralı: Gelirin %50'si İhtiyaçlar, %30'u İstekler, %20'si Tasarruf.</p>
+          <div id="ftt-host"></div>
         </section>
 
         <!-- Bütçe limitleri -->
@@ -314,6 +350,15 @@
             </label>
           </div>
 
+          <!-- Hızlı Tutar Çipleri -->
+          <div class="amount-chips" data-target="edit-tx-amount">
+            <button type="button" class="chip-btn" data-add="50">+50</button>
+            <button type="button" class="chip-btn" data-add="100">+100</button>
+            <button type="button" class="chip-btn" data-add="250">+250</button>
+            <button type="button" class="chip-btn" data-add="500">+500</button>
+            <button type="button" class="chip-btn" data-add="1000">+1.000</button>
+          </div>
+
           <label class="field">
             <span>Kategori</span>
             <select name="categoryId" id="edit-tx-category" required></select>
@@ -374,6 +419,50 @@
             <button type="button" class="btn btn-secondary" id="cancel-edit-rec">İptal</button>
             <button type="submit" class="btn btn-primary">Kaydet</button>
           </div>
+        </form>
+      </div>
+    </dialog>
+
+    <!-- Özel Kategori Yönetimi Modalı -->
+    <dialog id="custom-cat-dialog" class="glass-modal">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3>Özel Kategoriler</h3>
+          <button type="button" class="icon-btn close-btn" id="close-custom-cat" aria-label="Kapat">
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+          </button>
+        </div>
+        
+        <ul class="custom-cat-list" id="custom-cat-list"></ul>
+
+        <form id="custom-cat-form" class="tx-form custom-cat-form">
+          <h4>Yeni Kategori Ekle</h4>
+          <div class="segmented" role="radiogroup" aria-label="Kategori türü">
+            <button type="button" class="seg-btn is-active" data-type="expense" role="radio" aria-checked="true">Gider</button>
+            <button type="button" class="seg-btn" data-type="income" role="radio" aria-checked="false">Gelir</button>
+          </div>
+          <input type="hidden" name="type" id="custom-cat-type" value="expense" />
+
+          <div class="field-row">
+            <label class="field" style="max-width: 90px;">
+              <span>İkon</span>
+              <input type="text" name="icon" id="custom-cat-icon" maxlength="4" placeholder="🐾" value="🏷️" required />
+            </label>
+            <label class="field">
+              <span>Kategori Adı</span>
+              <input type="text" name="name" id="custom-cat-name" maxlength="30" placeholder="ör. Evcil Hayvan" required />
+            </label>
+          </div>
+
+          <label class="field" id="custom-cat-bucket-field">
+            <span>50/30/20 Sınıfı</span>
+            <select name="bucket" id="custom-cat-bucket">
+              <option value="needs">İhtiyaç (Zorunlu Gider)</option>
+              <option value="wants">İstek (Keyfi / Sosyal Gider)</option>
+            </select>
+          </label>
+
+          <button type="submit" class="btn btn-primary btn-block">Kategoriyi Ekle</button>
         </form>
       </div>
     </dialog>

@@ -3,7 +3,8 @@ import {
   normalize, SCHEMA,
   addTransaction, removeTransaction, updateTransaction, transactionsInMonth,
   addRecurring, removeRecurring, updateRecurring, setRecurringActive, materializeRecurring,
-  setBudget, periodKey, shiftPeriod,
+  setBudget, addCustomCategory, removeCustomCategory, updateCustomCategory,
+  periodKey, shiftPeriod,
 } from '../src/state.js';
 
 describe('state.js unit tests', () => {
@@ -12,6 +13,7 @@ describe('state.js unit tests', () => {
     expect(s.schema).toBe(SCHEMA);
     expect(s.transactions).toEqual([]);
     expect(s.recurring).toEqual([]);
+    expect(s.customCategories).toEqual([]);
     expect(s.budgets).toEqual({});
   });
 
@@ -97,5 +99,28 @@ describe('state.js unit tests', () => {
 
     setBudget(s, 'gider-market', 0);
     expect(s.budgets['gider-market']).toBeUndefined();
+  });
+
+  it('addCustomCategory, updateCustomCategory and removeCustomCategory work correctly', () => {
+    const s = normalize({});
+    const cat = addCustomCategory(s, {
+      type: 'expense',
+      name: 'Evcil Hayvan',
+      icon: '🐾',
+      bucket: 'needs',
+    });
+
+    expect(cat).not.toBeNull();
+    expect(s.customCategories.length).toBe(1);
+    expect(s.customCategories[0].name).toBe('Evcil Hayvan');
+    expect(s.customCategories[0].icon).toBe('🐾');
+    expect(s.customCategories[0].bucket).toBe('needs');
+
+    updateCustomCategory(s, cat.id, { name: 'Kedi & Köpek' });
+    expect(s.customCategories[0].name).toBe('Kedi & Köpek');
+
+    const removed = removeCustomCategory(s, cat.id);
+    expect(removed).toBe(true);
+    expect(s.customCategories.length).toBe(0);
   });
 });
