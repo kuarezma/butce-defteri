@@ -4,23 +4,27 @@ import {
   addTransaction, removeTransaction, updateTransaction, transactionsInMonth,
   addRecurring, removeRecurring, updateRecurring, setRecurringActive, materializeRecurring,
   setBudget, addCustomCategory, removeCustomCategory,
+  addGoal, removeGoal, updateGoal, contributeToGoal,
+  hasPin, setPin, verifyPin, removePin,
   periodKey, shiftPeriod,
 } from './state.js';
 import {
   monthTotals, categoryBreakdown, trendSeries, budgetStatus, trailingAverageExpense, savingsRate,
-  computeFiftyThirtyTwenty,
+  computeFiftyThirtyTwenty, parseQuickEntry, annualSummary, dailyExpenseHeatmap,
 } from './compute.js';
 import {
   fillCategorySelect, fillBudgetCategorySelect,
   renderStats, renderTransactionList, renderCategoryChart, renderTrendChart,
   renderBudgetList, renderRecurringList, renderFiftyThirtyTwenty, renderCustomCategoryList,
+  renderGoalsList, renderCalendarHeatmap, renderAnnualReport,
   monthLabel, setPrivacyMode, isPrivacyMode,
 } from './render.js';
-import { transactionsToCsv, downloadCsv } from './export.js';
+import { transactionsToCsv, downloadCsv, parseCsvToTransactions } from './export.js';
 import { getIcon } from './icons.js';
 
 const state = load();
 let currentPeriod = periodKey();
+let currentAnnualYear = parseInt(currentPeriod.slice(0, 4), 10);
 let categoryChartType = 'expense';
 let txSearchQuery = '';
 let txTypeFilter = 'all';
@@ -63,6 +67,12 @@ function updatePrivacyIcon() {
   host.innerHTML = isPrivacyMode() ? getIcon('eyeOff') : getIcon('eye');
 }
 
+function updatePinIcon() {
+  const host = document.getElementById('pin-icon');
+  if (!host) return;
+  host.innerHTML = hasPin() ? getIcon('lock') : getIcon('unlock');
+}
+
 const els = {
   monthLabel: document.getElementById('month-label'),
   prevMonth: document.getElementById('prev-month'),
@@ -78,6 +88,12 @@ const els = {
   themeToggleBtn: document.getElementById('theme-toggle-btn'),
   privacyToggleBtn: document.getElementById('privacy-toggle-btn'),
   customCatBtn: document.getElementById('custom-cat-btn'),
+  pinToggleBtn: document.getElementById('pin-toggle-btn'),
+  annualReportBtn: document.getElementById('annual-report-btn'),
+
+  // Quick Entry
+  quickEntryForm: document.getElementById('quick-entry-form'),
+  quickEntryInput: document.getElementById('quick-entry-input'),
 
   txForm: document.getElementById('tx-form'),
   txType: document.getElementById('tx-type'),
@@ -91,6 +107,9 @@ const els = {
   categoryChartHost: document.getElementById('category-chart'),
   trendChartHost: document.getElementById('trend-chart'),
   fttHost: document.getElementById('ftt-host'),
+  heatmapHost: document.getElementById('heatmap-host'),
+  goalsList: document.getElementById('goals-list'),
+  addGoalBtn: document.getElementById('add-goal-btn'),
 
   budgetList: document.getElementById('budget-list'),
   budgetForm: document.getElementById('budget-form'),
@@ -101,7 +120,7 @@ const els = {
   recCategory: document.getElementById('rec-category'),
   recurringList: document.getElementById('recurring-list'),
 
-  // Edit Modalleri
+  // Modals
   editTxDialog: document.getElementById('edit-tx-dialog'),
   editTxForm: document.getElementById('edit-tx-form'),
   editTxId: document.getElementById('edit-tx-id'),
@@ -124,7 +143,6 @@ const els = {
   closeEditRec: document.getElementById('close-edit-rec'),
   cancelEditRec: document.getElementById('cancel-edit-rec'),
 
-  // Custom Categories Modal
   customCatDialog: document.getElementById('custom-cat-dialog'),
   customCatForm: document.getElementById('custom-cat-form'),
   customCatType: document.getElementById('custom-cat-type'),
@@ -135,7 +153,53 @@ const els = {
   customCatList: document.getElementById('custom-cat-list'),
   closeCustomCat: document.getElementById('close-custom-cat'),
 
+  // Goal Modals
+  goalDialog: document.getElementById('goal-dialog'),
+  goalForm: document.getElementById('goal-form'),
+  goalIcon: document.getElementById('goal-icon'),
+  goalName: document.getElementById('goal-name'),
+  goalTarget: document.getElementById('goal-target'),
+  goalCurrent: document.getElementById('goal-current'),
+  goalDate: document.getElementById('goal-date'),
+  closeGoalDialog: document.getElementById('close-goal-dialog'),
+  cancelGoalBtn: document.getElementById('cancel-goal-btn'),
+
+  goalDepositDialog: document.getElementById('goal-deposit-dialog'),
+  goalDepositForm: document.getElementById('goal-deposit-form'),
+  goalDepositTitle: document.getElementById('goal-deposit-title'),
+  depositGoalId: document.getElementById('deposit-goal-id'),
+  depositGoalMode: document.getElementById('deposit-goal-mode'),
+  depositAmountLabel: document.getElementById('deposit-amount-label'),
+  depositGoalAmount: document.getElementById('deposit-goal-amount'),
+  closeGoalDeposit: document.getElementById('close-goal-deposit'),
+  cancelDepositBtn: document.getElementById('cancel-deposit-btn'),
+
+  // Annual Report Modal
+  annualDialog: document.getElementById('annual-dialog'),
+  annualYearLabel: document.getElementById('annual-year-label'),
+  annualReportHost: document.getElementById('annual-report-host'),
+  prevYearBtn: document.getElementById('prev-year-btn'),
+  nextYearBtn: document.getElementById('next-year-btn'),
+  closeAnnualDialog: document.getElementById('close-annual-dialog'),
+
+  // PIN Lock & Modal
+  pinDialog: document.getElementById('pin-dialog'),
+  pinForm: document.getElementById('pin-form'),
+  pinInput: document.getElementById('pin-input'),
+  pinStatusDesc: document.getElementById('pin-status-desc'),
+  savePinBtn: document.getElementById('save-pin-btn'),
+  removePinBtn: document.getElementById('remove-pin-btn'),
+  closePinDialog: document.getElementById('close-pin-dialog'),
+  cancelPinBtn: document.getElementById('cancel-pin-btn'),
+
+  pinLockOverlay: document.getElementById('pin-lock-overlay'),
+  pinUnlockForm: document.getElementById('pin-unlock-form'),
+  pinUnlockInput: document.getElementById('pin-unlock-input'),
+  pinErrorMsg: document.getElementById('pin-error-msg'),
+
   exportCsvBtn: document.getElementById('export-csv-btn'),
+  importCsvBtn: document.getElementById('import-csv-btn'),
+  importCsvInput: document.getElementById('import-csv-input'),
   exportBtn: document.getElementById('export-btn'),
   importBtn: document.getElementById('import-btn'),
   importInput: document.getElementById('import-input'),
@@ -162,6 +226,29 @@ function getDefaultDateForPeriod(period) {
   const todayIso = new Date().toISOString().slice(0, 10);
   if (todayIso.startsWith(period)) return todayIso;
   return `${period}-01`;
+}
+
+// ---------- PIN Kilit Kontrolü ----------
+
+if (hasPin()) {
+  els.pinLockOverlay.hidden = false;
+  setTimeout(() => els.pinUnlockInput.focus(), 100);
+}
+
+if (els.pinUnlockForm) {
+  els.pinUnlockForm.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const pin = els.pinUnlockInput.value.trim();
+    if (verifyPin(pin)) {
+      els.pinLockOverlay.hidden = true;
+      els.pinUnlockInput.value = '';
+      els.pinErrorMsg.hidden = true;
+    } else {
+      els.pinErrorMsg.hidden = false;
+      els.pinUnlockInput.value = '';
+      els.pinUnlockInput.focus();
+    }
+  });
 }
 
 // ---------- Segmented kontrol yardımcı ----------
@@ -204,6 +291,40 @@ document.querySelectorAll('.amount-chips').forEach((chipContainer) => {
   });
 });
 
+// ---------- Akıllı Tek Satır Hızlı Giriş ----------
+
+if (els.quickEntryForm) {
+  els.quickEntryForm.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const text = els.quickEntryInput.value.trim();
+    if (!text) return;
+
+    const parsed = parseQuickEntry(text, state.customCategories);
+    if (!parsed) {
+      status('Anlaşılamadı — örn: "market 350", "kahve 85", "maaş 65000"', 'error');
+      return;
+    }
+
+    const t = addTransaction(state, {
+      type: parsed.type,
+      amount: parsed.amount,
+      categoryId: parsed.categoryId,
+      date: getDefaultDateForPeriod(currentPeriod),
+      note: parsed.note,
+    });
+
+    if (!t) {
+      status('Hızlı işlem eklenemedi.', 'error');
+      return;
+    }
+
+    persist();
+    paint();
+    els.quickEntryInput.value = '';
+    status(`"₺${parsed.amount} - ${parsed.note}" akıllı olarak eklendi.`);
+  });
+}
+
 // ---------- Ana çizim ----------
 
 function paint() {
@@ -228,6 +349,10 @@ function paint() {
   const fttAnalysis = computeFiftyThirtyTwenty(state, currentPeriod);
   renderFiftyThirtyTwenty(els.fttHost, fttAnalysis);
 
+  const heatmapData = dailyExpenseHeatmap(state, currentPeriod);
+  renderCalendarHeatmap(els.heatmapHost, heatmapData);
+
+  renderGoalsList(els.goalsList, state.goals);
   renderBudgetList(els.budgetList, budgetStatus(state, currentPeriod));
   renderRecurringList(els.recurringList, state.recurring, state.customCategories);
   renderCustomCategoryList(els.customCatList, state.customCategories);
@@ -243,7 +368,27 @@ refreshCategorySelects();
 els.txForm.date.value = getDefaultDateForPeriod(currentPeriod);
 updatePrivacyIcon();
 updateThemeIcon();
+updatePinIcon();
 paint();
+
+// ---------- Isı Haritası Tıklama Filtresi ----------
+
+if (els.heatmapHost) {
+  els.heatmapHost.addEventListener('click', (e) => {
+    const cell = e.target.closest('.heatmap-cell:not(.is-empty)');
+    if (!cell) return;
+    const date = cell.dataset.date;
+    if (!date) return;
+    txSearchQuery = date;
+    els.txSearchInput.value = date;
+    renderTransactionList(els.txList, els.txCountBadge, transactionsInMonth(state, currentPeriod), {
+      search: txSearchQuery,
+      filter: txTypeFilter,
+      customCategories: state.customCategories,
+    });
+    els.txList.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  });
+}
 
 // ---------- Tema ve Gizlilik Butonları ----------
 
@@ -265,6 +410,78 @@ if (els.privacyToggleBtn) {
     paint();
     status(next ? 'Gizlilik modu aktif (tutarlar gizlendi).' : 'Gizlilik modu kapatıldı.');
   });
+}
+
+// ---------- PIN Dialog ----------
+
+if (els.pinToggleBtn) {
+  els.pinToggleBtn.addEventListener('click', () => {
+    const active = hasPin();
+    els.pinStatusDesc.textContent = active
+      ? 'PIN koruması aktif. PIN kodunu değiştirebilir veya kilidi kaldırabilirsiniz.'
+      : 'Uygulama açılışında gizlilik için 4 haneli PIN kodu belirleyin.';
+    els.removePinBtn.hidden = !active;
+    els.savePinBtn.textContent = active ? 'PIN Güncelle' : 'PIN Kaydet';
+    els.pinInput.value = '';
+    if (els.pinDialog.showModal) els.pinDialog.showModal();
+    else els.pinDialog.setAttribute('open', '');
+  });
+}
+
+if (els.closePinDialog) els.closePinDialog.addEventListener('click', () => els.pinDialog.close());
+if (els.cancelPinBtn) els.cancelPinBtn.addEventListener('click', () => els.pinDialog.close());
+
+if (els.pinForm) {
+  els.pinForm.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const pin = els.pinInput.value.trim();
+    if (pin.length !== 4 || !/^\d{4}$/.test(pin)) {
+      status('PIN tam olarak 4 haneli rakam olmalıdır.', 'error');
+      return;
+    }
+    setPin(pin);
+    updatePinIcon();
+    els.pinDialog.close();
+    status('PIN kilidi başarıyla etkinleştirildi.');
+  });
+}
+
+if (els.removePinBtn) {
+  els.removePinBtn.addEventListener('click', () => {
+    removePin();
+    updatePinIcon();
+    els.pinDialog.close();
+    status('PIN kilidi kaldırıldı.');
+  });
+}
+
+// ---------- Yıllık Özet Dialog ----------
+
+function openAnnualReport(year) {
+  currentAnnualYear = year;
+  els.annualYearLabel.textContent = `${year} Yıllık Finans Özeti`;
+  const summary = annualSummary(state, year);
+  renderAnnualReport(els.annualReportHost, summary);
+  if (els.annualDialog.showModal) els.annualDialog.showModal();
+  else els.annualDialog.setAttribute('open', '');
+}
+
+if (els.annualReportBtn) {
+  els.annualReportBtn.addEventListener('click', () => {
+    openAnnualReport(parseInt(currentPeriod.slice(0, 4), 10));
+  });
+}
+
+if (els.prevYearBtn) {
+  els.prevYearBtn.addEventListener('click', () => openAnnualReport(currentAnnualYear - 1));
+}
+
+if (els.nextYearBtn) {
+  els.nextYearBtn.addEventListener('click', () => openAnnualReport(currentAnnualYear + 1));
+}
+
+if (els.closeAnnualDialog) {
+  els.closeAnnualDialog.addEventListener('click', () => els.annualDialog.close());
 }
 
 // ---------- Ay gezinme ----------
@@ -407,6 +624,98 @@ els.editTxForm.addEventListener('submit', (event) => {
   els.editTxDialog.close();
   status('İşlem başarıyla güncellendi.');
 });
+
+// ---------- Hedef Birikimler (Kumbara) Yönetimi ----------
+
+if (els.addGoalBtn) {
+  els.addGoalBtn.addEventListener('click', () => {
+    els.goalForm.reset();
+    els.goalIcon.value = '🎯';
+    if (els.goalDialog.showModal) els.goalDialog.showModal();
+    else els.goalDialog.setAttribute('open', '');
+  });
+}
+
+if (els.closeGoalDialog) els.closeGoalDialog.addEventListener('click', () => els.goalDialog.close());
+if (els.cancelGoalBtn) els.cancelGoalBtn.addEventListener('click', () => els.goalDialog.close());
+
+if (els.goalForm) {
+  els.goalForm.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const form = new FormData(els.goalForm);
+    const goal = addGoal(state, {
+      name: form.get('name'),
+      targetAmount: form.get('targetAmount'),
+      currentAmount: form.get('currentAmount') || 0,
+      targetDate: form.get('targetDate') || null,
+      icon: form.get('icon') || '🎯',
+    });
+
+    if (!goal) {
+      status('Hedef eklenemedi — alanları kontrol et.', 'error');
+      return;
+    }
+
+    persist();
+    paint();
+    els.goalDialog.close();
+    status(`"${goal.name}" birikim hedefi oluşturuldu.`);
+  });
+}
+
+if (els.goalsList) {
+  els.goalsList.addEventListener('click', (e) => {
+    const depositBtn = e.target.closest('[data-deposit-goal]');
+    const withdrawBtn = e.target.closest('[data-withdraw-goal]');
+    const deleteBtn = e.target.closest('[data-delete-goal]');
+
+    if (deleteBtn) {
+      removeGoal(state, deleteBtn.dataset.deleteGoal);
+      persist();
+      paint();
+      status('Birikim hedefi silindi.');
+      return;
+    }
+
+    if (depositBtn || withdrawBtn) {
+      const goalId = depositBtn ? depositBtn.dataset.depositGoal : withdrawBtn.dataset.withdrawGoal;
+      const isDeposit = Boolean(depositBtn);
+      const goal = state.goals.find((g) => g.id === goalId);
+      if (!goal) return;
+
+      els.depositGoalId.value = goal.id;
+      els.depositGoalMode.value = isDeposit ? 'deposit' : 'withdraw';
+      els.goalDepositTitle.textContent = isDeposit ? `"${goal.name}" Hedefine Para Ekle` : `"${goal.name}" Hedefinden Para Çek`;
+      els.depositAmountLabel.textContent = isDeposit ? 'Eklenecek Tutar (₺)' : 'Çekilecek Tutar (₺)';
+      els.depositGoalAmount.value = '';
+
+      if (els.goalDepositDialog.showModal) els.goalDepositDialog.showModal();
+      else els.goalDepositDialog.setAttribute('open', '');
+    }
+  });
+}
+
+if (els.closeGoalDeposit) els.closeGoalDeposit.addEventListener('click', () => els.goalDepositDialog.close());
+if (els.cancelDepositBtn) els.cancelDepositBtn.addEventListener('click', () => els.goalDepositDialog.close());
+
+if (els.goalDepositForm) {
+  els.goalDepositForm.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const id = els.depositGoalId.value;
+    const mode = els.depositGoalMode.value;
+    const amount = Number(els.depositGoalAmount.value);
+    if (!Number.isFinite(amount) || amount <= 0) return;
+
+    const delta = mode === 'deposit' ? amount : -amount;
+    const updated = contributeToGoal(state, id, delta);
+    if (!updated) return;
+
+    persist();
+    paint();
+    els.goalDepositDialog.close();
+    status(mode === 'deposit' ? `Hedefe ₺${amount} eklendi.` : `Hedeften ₺${amount} çekildi.`);
+  });
+}
 
 // ---------- Kategori grafiği geçişi ----------
 
@@ -597,7 +906,7 @@ if (els.customCatList) {
   });
 }
 
-// ---------- CSV Dışa Aktarma ----------
+// ---------- CSV Dışa / İçe Aktarma ----------
 
 if (els.exportCsvBtn) {
   els.exportCsvBtn.addEventListener('click', () => {
@@ -609,6 +918,34 @@ if (els.exportCsvBtn) {
     const csvData = transactionsToCsv(state.transactions, state.customCategories);
     downloadCsv(csvData, `butce-islemleri-${stamp}.csv`);
     status('İşlemler Excel/CSV olarak indirildi.');
+  });
+}
+
+if (els.importCsvBtn) {
+  els.importCsvBtn.addEventListener('click', () => els.importCsvInput.click());
+}
+
+if (els.importCsvInput) {
+  els.importCsvInput.addEventListener('change', async () => {
+    const file = els.importCsvInput.files?.[0];
+    els.importCsvInput.value = '';
+    if (!file) return;
+    try {
+      const text = await file.text();
+      const importedTxs = parseCsvToTransactions(text, state.customCategories);
+      if (importedTxs.length === 0) {
+        status('CSV dosyasında geçerli işlem satırı bulunamadı.', 'error');
+        return;
+      }
+      for (const t of importedTxs) {
+        addTransaction(state, t);
+      }
+      persist();
+      paint();
+      status(`${importedTxs.length} işlem CSV'den başarıyla içe aktarıldı.`);
+    } catch {
+      status('CSV dosyası okunamadı veya format uyumsuz.', 'error');
+    }
   });
 }
 
@@ -661,6 +998,7 @@ els.resetConfirm.addEventListener('click', (event) => {
     state.transactions = [];
     state.recurring = [];
     state.customCategories = [];
+    state.goals = [];
     state.budgets = {};
     state.materialized = {};
     persist();

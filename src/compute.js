@@ -186,3 +186,189 @@ export function computeFiftyThirtyTwenty(state, period) {
     statusTone,
   };
 }
+
+/**
+ * Akıllı Tek Satır Hızlı Giriş Ayrıştırıcı (Smart Quick Entry Parser)
+ * "market 350", "kahve 85 arkadaşla", "maaş 65000", "benzin 1200", "kira 15000"
+ */
+export function parseQuickEntry(rawText, customCategories = []) {
+  if (!rawText || typeof rawText !== 'string') return null;
+  const text = rawText.trim();
+  if (!text) return null;
+
+  // Tutarı bul (örn. 350, 45.50, 1200 TL, ₺500)
+  const amountMatch = text.match(/(?:₺\s*)?(\d+(?:[.,]\d+)?)(?:\s*(?:tl|₺))?/i);
+  if (!amountMatch) return null;
+
+  const rawAmountStr = amountMatch[1].replace(',', '.');
+  const amount = parseFloat(rawAmountStr);
+  if (!Number.isFinite(amount) || amount <= 0) return null;
+
+  const textWithoutAmount = text.replace(amountMatch[0], '').trim();
+  const lower = textWithoutAmount.toLowerCase();
+
+  const keywordsMap = [
+    { keys: ['maaş', 'maas', 'avans', 'gelir', 'hakediş', 'ücret', 'burs'], catId: 'gelir-maas', type: 'income' },
+    { keys: ['ek iş', 'freelance', 'satış', 'ek gelir', 'ikramiye', 'prim'], catId: 'gelir-ek', type: 'income' },
+    { keys: ['kira', 'aidat', 'ev', 'tadilat', 'apartman'], catId: 'gider-konut', type: 'expense' },
+    { keys: ['market', 'bakkal', 'süpermarket', 'manav', 'kasap', 'şok', 'bim', 'a101', 'migros', 'carrefour'], catId: 'gider-market', type: 'expense' },
+    { keys: ['fatura', 'elektrik', 'su', 'doğalgaz', 'dogalgaz', 'internet', 'telefon', 'turkcell', 'vodafone', 'türk telekom'], catId: 'gider-fatura', type: 'expense' },
+    { keys: ['benzin', 'mazot', 'yakıt', 'otobüs', 'metro', 'akbil', 'taksi', 'uber', 'otopark', 'hgs', 'ulasim', 'ulaşım'], catId: 'gider-ulasim', type: 'expense' },
+    { keys: ['yemek', 'kahve', 'cafe', 'kafe', 'restoran', 'lokanta', 'starbucks', 'yemeksepeti', 'getir', 'trendyol yemek', 'dışarıda'], catId: 'gider-disarida', type: 'expense' },
+    { keys: ['netflix', 'spotify', 'youtube', 'sinema', 'tiyatro', 'konser', 'oyun', 'steam', 'playstation', 'eğlence', 'tatil'], catId: 'gider-eglence', type: 'expense' },
+    { keys: ['eczane', 'ilaç', 'doktor', 'hastane', 'sağlık', 'diş', 'tedavi'], catId: 'gider-saglik', type: 'expense' },
+    { keys: ['giyim', 'kıyafet', 'ayakkabı', 'pantolon', 'tişört', 'zara', 'h&m'], catId: 'gider-giyim', type: 'expense' },
+    { keys: ['kurs', 'kitap', 'eğitim', 'udemy', 'okul', 'harç'], catId: 'gider-egitim', type: 'expense' },
+    { keys: ['kredi', 'borç', 'kart', 'taksit', 'faiz'], catId: 'gider-borc', type: 'expense' },
+  ];
+
+  for (const c of customCategories) {
+    keywordsMap.unshift({
+      keys: [c.name.toLowerCase(), c.name.toLowerCase().replace(/\s+/g, '')],
+      catId: c.id,
+      type: c.type,
+    });
+  }
+
+  let matchedType = 'expense';
+  let matchedCatId = 'gider-diger';
+
+  for (const item of keywordsMap) {
+    if (item.keys.some((k) => lower.includes(k))) {
+      matchedType = item.type;
+      matchedCatId = item.catId;
+      break;
+    }
+  }
+
+  const note = textWithoutAmount || (matchedType === 'income' ? 'Gelir' : 'Gider');
+
+  return {
+    type: matchedType,
+    categoryId: matchedCatId,
+    amount,
+    note,
+  };
+}
+
+/**
+ * Yıllık Kümülatif Özet ve Karşılaştırma Raporu (Annual Overview)
+ */
+export function annualSummary(state, year = new Date().getFullYear()) {
+  const yearStr = String(year);
+  const monthNames = ['Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran', 'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'];
+  
+  const months = [];
+  let totalIncome = 0;
+  let totalExpense = 0;
+  let highestExpense = { monthName: '-', amount: 0 };
+  const categorySums = new Map();
+
+  for (let m = 1; m <= 12; m += 1) {
+    const period = `${yearStr}-${String(m).padStart(2, '0')}`;
+    const totals = monthTotals(state, period);
+    const sRate = savingsRate(totals);
+
+    totalIncome += totals.income;
+    totalExpense += totals.expense;
+
+    if (totals.expense > highestExpense.amount) {
+      highestExpense = { monthName: monthNames[m - 1], amount: totals.expense };
+    }
+
+    const txs = transactionsInMonth(state, period).filter((t) => t.type === 'expense');
+    for (const t of txs) {
+      categorySums.set(t.categoryId, (categorySums.get(t.categoryId) || 0) + t.amount);
+    }
+
+    months.push({
+      period,
+      monthName: monthNames[m - 1],
+      income: totals.income,
+      expense: totals.expense,
+      net: totals.net,
+      savingsRate: sRate,
+      count: totals.count,
+    });
+  }
+
+  const topCategories = [...categorySums.entries()]
+    .map(([categoryId, amount]) => ({
+      categoryId,
+      category: categoryById(categoryId, state.customCategories) || { id: categoryId, name: 'Diğer', icon: '🏷️' },
+      amount,
+      percent: totalExpense > 0 ? Math.round((amount / totalExpense) * 100) : 0,
+    }))
+    .sort((a, b) => b.amount - a.amount)
+    .slice(0, 5);
+
+  const totalNet = totalIncome - totalExpense;
+  const avgSavingsRate = totalIncome > 0 ? Math.round((totalNet / totalIncome) * 100) : 0;
+
+  return {
+    year: yearStr,
+    months,
+    totalIncome,
+    totalExpense,
+    totalNet,
+    avgSavingsRate,
+    topCategories,
+    highestExpenseMonth: highestExpense,
+  };
+}
+
+/**
+ * Günlük Harcama Dağılım Isı Haritası (Daily Expense Heatmap)
+ */
+export function dailyExpenseHeatmap(state, period) {
+  const [y, m] = period.split('-').map(Number);
+  const daysInMonth = new Date(y, m, 0).getDate();
+  const txs = transactionsInMonth(state, period).filter((t) => t.type === 'expense');
+
+  const dayMap = new Map();
+  for (const t of txs) {
+    const day = parseInt(t.date.slice(8, 10), 10);
+    const cur = dayMap.get(day) || { total: 0, count: 0 };
+    cur.total += t.amount;
+    cur.count += 1;
+    dayMap.set(day, cur);
+  }
+
+  let maxDaily = 0;
+  for (const val of dayMap.values()) {
+    if (val.total > maxDaily) maxDaily = val.total;
+  }
+
+  const days = [];
+  for (let d = 1; d <= daysInMonth; d += 1) {
+    const dateStr = `${period}-${String(d).padStart(2, '0')}`;
+    const dateObj = new Date(y, m - 1, d);
+    const dayOfWeek = (dateObj.getDay() + 6) % 7; // 0: Pazartesi, 6: Pazar
+    const info = dayMap.get(d) || { total: 0, count: 0 };
+
+    let intensity = 0;
+    if (info.total > 0 && maxDaily > 0) {
+      const ratio = info.total / maxDaily;
+      if (ratio > 0.75) intensity = 4;
+      else if (ratio > 0.45) intensity = 3;
+      else if (ratio > 0.2) intensity = 2;
+      else intensity = 1;
+    }
+
+    days.push({
+      date: dateStr,
+      dayNum: d,
+      dayOfWeek,
+      totalExpense: info.total,
+      count: info.count,
+      intensity,
+    });
+  }
+
+  return {
+    period,
+    days,
+    maxDaily,
+    firstDayOfWeek: (new Date(y, m - 1, 1).getDay() + 6) % 7,
+  };
+}

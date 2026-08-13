@@ -270,4 +270,173 @@ export function renderCustomCategoryList(container, customCategories = []) {
   }).join('');
 }
 
+// ---------- Hedef Birikimler (Kumbara) ----------
+
+export function renderGoalsList(container, goals = []) {
+  if (!container) return;
+  if (!goals || goals.length === 0) {
+    container.innerHTML = '<li class="empty-row">Henüz birikim hedefi eklenmedi. "Yeni Hedef Ekle" butonuyla başlayabilirsin.</li>';
+    return;
+  }
+
+  container.innerHTML = goals.map((g) => {
+    const pct = g.targetAmount > 0 ? Math.min(100, Math.round((g.currentAmount / g.targetAmount) * 100)) : 0;
+    const remaining = Math.max(0, g.targetAmount - g.currentAmount);
+    const isCompleted = g.currentAmount >= g.targetAmount;
+
+    return `
+      <li class="goal-card ${isCompleted ? 'is-completed' : ''}" data-id="${esc(g.id)}">
+        <div class="goal-header">
+          <span class="goal-icon">${esc(g.icon || '🎯')}</span>
+          <div class="goal-info">
+            <h4>${esc(g.name)} ${isCompleted ? '🎉 (Tamamlandı!)' : ''}</h4>
+            <div class="goal-sub">
+              ${g.targetDate ? `Hedef Tarih: ${esc(g.targetDate)} · ` : ''}
+              Kalan: ${money(remaining)}
+            </div>
+          </div>
+          <div class="goal-figures">
+            <strong>${money(g.currentAmount)}</strong>
+            <span>/ ${money(g.targetAmount)} (%${pct})</span>
+          </div>
+        </div>
+
+        <div class="goal-progress" role="progressbar" aria-valuenow="${pct}" aria-valuemin="0" aria-valuemax="100">
+          <div class="goal-progress-fill" style="width: ${pct}%"></div>
+        </div>
+
+        <div class="goal-actions">
+          <button type="button" class="btn btn-xs btn-primary" data-deposit-goal="${esc(g.id)}">
+            <span>+ Para Ekle</span>
+          </button>
+          <button type="button" class="btn btn-xs btn-secondary" data-withdraw-goal="${esc(g.id)}">
+            <span>− Para Çek</span>
+          </button>
+          <button type="button" class="row-delete" data-delete-goal="${esc(g.id)}" aria-label="Hedefi Sil">
+            ${getIcon('trash')}
+          </button>
+        </div>
+      </li>
+    `;
+  }).join('');
+}
+
+// ---------- Harcama Isı Haritası (Calendar Heatmap) ----------
+
+export function renderCalendarHeatmap(host, heatmapData) {
+  if (!host || !heatmapData) return;
+
+  const weekdays = ['Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt', 'Paz'];
+  const headerHtml = weekdays.map((w) => `<div class="heatmap-day-label">${w}</div>`).join('');
+
+  let emptyCells = '';
+  for (let i = 0; i < heatmapData.firstDayOfWeek; i += 1) {
+    emptyCells += '<div class="heatmap-cell is-empty"></div>';
+  }
+
+  const cellsHtml = heatmapData.days.map((d) => {
+    const title = `${d.dayNum} ${monthShortLabel(heatmapData.period)}: ${money(d.totalExpense)} (${d.count} işlem)`;
+    return `
+      <div class="heatmap-cell" data-intensity="${d.intensity}" data-date="${esc(d.date)}" title="${esc(title)}">
+        <span class="cell-day">${d.dayNum}</span>
+        ${d.totalExpense > 0 ? `<span class="cell-dot"></span>` : ''}
+      </div>
+    `;
+  }).join('');
+
+  host.innerHTML = `
+    <div class="calendar-heatmap">
+      <div class="heatmap-grid">
+        ${headerHtml}
+        ${emptyCells}
+        ${cellsHtml}
+      </div>
+      <div class="heatmap-legend">
+        <span>0 ₺</span>
+        <div class="legend-scale">
+          <span class="scale-box" data-intensity="0"></span>
+          <span class="scale-box" data-intensity="1"></span>
+          <span class="scale-box" data-intensity="2"></span>
+          <span class="scale-box" data-intensity="3"></span>
+          <span class="scale-box" data-intensity="4"></span>
+        </div>
+        <span>Çok</span>
+      </div>
+    </div>
+  `;
+}
+
+// ---------- Yıllık Özet Raporu (Annual Overview) ----------
+
+export function renderAnnualReport(host, summary) {
+  if (!host || !summary) return;
+
+  const monthRows = summary.months.map((m) => `
+    <tr class="annual-row ${m.count === 0 ? 'is-empty-month' : ''}">
+      <td class="col-month">${esc(m.monthName)}</td>
+      <td class="col-inc">${money(m.income)}</td>
+      <td class="col-exp">${money(m.expense)}</td>
+      <td class="col-net" data-sign="${m.net >= 0 ? 'positive' : 'negative'}">${money(m.net)}</td>
+      <td class="col-rate">%${m.savingsRate}</td>
+    </tr>
+  `).join('');
+
+  const topCatsHtml = summary.topCategories.map((c) => `
+    <div class="top-cat-pill">
+      <span class="pill-icon">${esc(c.category.icon)}</span>
+      <span class="pill-name">${esc(c.category.name)}</span>
+      <strong class="pill-amt">${money(c.amount)}</strong>
+      <span class="pill-pct">%${c.percent}</span>
+    </div>
+  `).join('');
+
+  host.innerHTML = `
+    <div class="annual-report-card">
+      <div class="annual-stats-grid">
+        <div class="annual-stat-tile">
+          <span class="stat-label">Toplam Gelir</span>
+          <strong class="stat-value text-blue">${money(summary.totalIncome)}</strong>
+        </div>
+        <div class="annual-stat-tile">
+          <span class="stat-label">Toplam Gider</span>
+          <strong class="stat-value text-orange">${money(summary.totalExpense)}</strong>
+        </div>
+        <div class="annual-stat-tile">
+          <span class="stat-label">Net Yıllık Birikim</span>
+          <strong class="stat-value ${summary.totalNet >= 0 ? 'text-green' : 'text-red'}">${money(summary.totalNet)}</strong>
+        </div>
+        <div class="annual-stat-tile">
+          <span class="stat-label">Ort. Tasarruf Oranı</span>
+          <strong class="stat-value text-aqua">%${summary.avgSavingsRate}</strong>
+        </div>
+      </div>
+
+      ${summary.topCategories.length > 0 ? `
+        <div class="annual-top-cats">
+          <h5>Yılın En Çok Harcama Yapılan Kategorileri</h5>
+          <div class="top-cats-wrapper">${topCatsHtml}</div>
+        </div>
+      ` : ''}
+
+      <div class="annual-table-wrapper">
+        <table class="annual-table">
+          <thead>
+            <tr>
+              <th>Ay</th>
+              <th>Gelir</th>
+              <th>Gider</th>
+              <th>Net</th>
+              <th>Tasarruf</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${monthRows}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  `;
+}
+
 export { CATEGORIES };
+

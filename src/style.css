@@ -1298,6 +1298,393 @@ dialog.glass-modal::backdrop {
   margin-bottom: 2px;
 }
 
+/* ---------- Akıllı Hızlı Giriş Çubuğu ---------- */
+
+.quick-entry-card {
+  padding: 12px 16px;
+}
+
+.quick-entry-input-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-pill);
+  padding: 6px 14px;
+  box-shadow: var(--shadow-sm);
+  transition: all 0.2s ease;
+}
+
+.quick-entry-input-wrapper:focus-within {
+  border-color: var(--accent-primary);
+  box-shadow: 0 0 16px var(--accent-glow);
+}
+
+.quick-entry-icon {
+  display: flex;
+  align-items: center;
+  color: var(--accent-primary);
+}
+
+#quick-entry-input {
+  border: none;
+  background: transparent;
+  padding: 6px 0;
+  font-size: 0.9rem;
+  color: var(--text-primary);
+  outline: none;
+  box-shadow: none;
+  width: 100%;
+}
+
+/* ---------- Hedef Birikimler (Kumbara) ---------- */
+
+.goals-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.goal-card {
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  transition: all 0.2s ease;
+}
+
+.goal-card.is-completed {
+  border-color: rgba(16, 185, 129, 0.35);
+  background: rgba(16, 185, 129, 0.03);
+}
+
+.goal-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.goal-icon {
+  font-size: 1.5rem;
+  line-height: 1;
+}
+
+.goal-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.goal-info h4 {
+  font-size: 0.96rem;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.goal-sub {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+
+.goal-figures {
+  text-align: right;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+}
+
+.goal-figures strong {
+  font-family: 'Outfit', sans-serif;
+  font-size: 1.05rem;
+  font-weight: 700;
+}
+
+.goal-figures span {
+  font-size: 0.76rem;
+  color: var(--text-muted);
+}
+
+.goal-progress {
+  width: 100%;
+  height: 8px;
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: var(--radius-pill);
+  overflow: hidden;
+}
+
+.goal-progress-fill {
+  height: 100%;
+  border-radius: var(--radius-pill);
+  background: linear-gradient(90deg, #6366f1, #10b981);
+  transition: width 0.5s ease;
+}
+
+.goal-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.btn-xs {
+  padding: 4px 10px;
+  font-size: 0.76rem;
+}
+
+/* ---------- Harcama Isı Haritası (Calendar Heatmap) ---------- */
+
+.calendar-heatmap {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 10px;
+}
+
+.heatmap-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 6px;
+}
+
+.heatmap-day-label {
+  text-align: center;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  padding-bottom: 4px;
+}
+
+.heatmap-cell {
+  aspect-ratio: 1;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  position: relative;
+  transition: all 0.2s ease;
+}
+
+.heatmap-cell:hover:not(.is-empty) {
+  transform: translateY(-2px);
+  border-color: var(--accent-primary);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  z-index: 2;
+}
+
+.heatmap-cell.is-empty {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.heatmap-cell[data-intensity='1'] { background: rgba(99, 102, 241, 0.15); color: #c7d2fe; border-color: rgba(99, 102, 241, 0.25); }
+.heatmap-cell[data-intensity='2'] { background: rgba(139, 92, 246, 0.3); color: #ede9fe; border-color: rgba(139, 92, 246, 0.4); }
+.heatmap-cell[data-intensity='3'] { background: rgba(236, 72, 153, 0.45); color: #ffffff; border-color: rgba(236, 72, 153, 0.55); }
+.heatmap-cell[data-intensity='4'] { background: rgba(244, 63, 94, 0.7); color: #ffffff; border-color: rgba(244, 63, 94, 0.85); box-shadow: 0 0 12px rgba(244, 63, 94, 0.35); }
+
+.cell-dot {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: currentColor;
+  margin-top: 1px;
+}
+
+.heatmap-legend {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  font-size: 0.72rem;
+  color: var(--text-muted);
+}
+
+.legend-scale {
+  display: flex;
+  gap: 4px;
+}
+
+.scale-box {
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.scale-box[data-intensity='1'] { background: rgba(99, 102, 241, 0.25); }
+.scale-box[data-intensity='2'] { background: rgba(139, 92, 246, 0.45); }
+.scale-box[data-intensity='3'] { background: rgba(236, 72, 153, 0.65); }
+.scale-box[data-intensity='4'] { background: rgba(244, 63, 94, 0.85); }
+
+/* ---------- Yıllık Özet & Karşılaştırma Modalı ---------- */
+
+dialog.wide-modal {
+  max-width: 680px;
+}
+
+.annual-year-nav {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.annual-report-card {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.annual-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+
+@media (max-width: 580px) {
+  .annual-stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+.annual-stat-tile {
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.annual-top-cats {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.annual-top-cats h5 {
+  font-size: 0.82rem;
+  color: var(--text-muted);
+}
+
+.top-cats-wrapper {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.top-cat-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: var(--radius-pill);
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border);
+  font-size: 0.8rem;
+}
+
+.top-cat-pill .pill-pct {
+  color: var(--accent-primary);
+  font-weight: 700;
+}
+
+.annual-table-wrapper {
+  overflow-x: auto;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+}
+
+.annual-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.82rem;
+  text-align: left;
+}
+
+.annual-table th {
+  background: rgba(255, 255, 255, 0.04);
+  padding: 10px 12px;
+  color: var(--text-muted);
+  font-weight: 600;
+  border-bottom: 1px solid var(--border);
+}
+
+.annual-table td {
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.annual-row.is-empty-month {
+  opacity: 0.5;
+}
+
+.text-blue { color: var(--series-blue); }
+.text-orange { color: var(--series-orange); }
+.text-green { color: var(--status-good); }
+.text-red { color: var(--status-critical); }
+.text-aqua { color: var(--series-aqua); }
+
+/* ---------- PIN Kilidi & Overlay ---------- */
+
+.pin-lock-overlay {
+  position: fixed;
+  inset: 0;
+  background: #07090e;
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  z-index: 99999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.pin-lock-overlay[hidden] {
+  display: none !important;
+}
+
+.lock-box {
+  width: 100%;
+  max-width: 360px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  padding: 32px 24px;
+}
+
+.lock-icon {
+  color: var(--accent-primary);
+}
+
+#pin-unlock-input {
+  font-size: 1.8rem;
+  letter-spacing: 0.4em;
+  text-align: center;
+  margin-bottom: 14px;
+}
+
+.pin-error {
+  color: var(--status-critical);
+  font-size: 0.82rem;
+  margin-top: 10px;
+}
+
 @keyframes backdropFadeIn {
   from { opacity: 0; }
   to { opacity: 1; }
@@ -1309,3 +1696,4 @@ dialog.glass-modal::backdrop {
     animation-duration: 0.01ms !important;
   }
 }
+

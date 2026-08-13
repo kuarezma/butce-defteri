@@ -1,19 +1,26 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import {
   normalize, SCHEMA,
   addTransaction, removeTransaction, updateTransaction, transactionsInMonth,
   addRecurring, removeRecurring, updateRecurring, setRecurringActive, materializeRecurring,
   setBudget, addCustomCategory, removeCustomCategory, updateCustomCategory,
+  addGoal, removeGoal, updateGoal, contributeToGoal,
+  setPin, verifyPin, removePin, hasPin,
   periodKey, shiftPeriod,
 } from '../src/state.js';
 
 describe('state.js unit tests', () => {
+  beforeEach(() => {
+    removePin();
+  });
+
   it('normalize returns empty state for null or invalid inputs', () => {
     const s = normalize(null);
     expect(s.schema).toBe(SCHEMA);
     expect(s.transactions).toEqual([]);
     expect(s.recurring).toEqual([]);
     expect(s.customCategories).toEqual([]);
+    expect(s.goals).toEqual([]);
     expect(s.budgets).toEqual({});
   });
 
@@ -122,5 +129,49 @@ describe('state.js unit tests', () => {
     const removed = removeCustomCategory(s, cat.id);
     expect(removed).toBe(true);
     expect(s.customCategories.length).toBe(0);
+  });
+
+  it('addGoal, contributeToGoal, updateGoal, and removeGoal work correctly', () => {
+    const s = normalize({});
+    const g = addGoal(s, {
+      name: 'Tatil Fonu',
+      targetAmount: 20000,
+      currentAmount: 5000,
+      icon: '🏖️',
+    });
+
+    expect(g).not.toBeNull();
+    expect(s.goals.length).toBe(1);
+    expect(s.goals[0].currentAmount).toBe(5000);
+
+    // Contribute
+    contributeToGoal(s, g.id, 3000);
+    expect(s.goals[0].currentAmount).toBe(8000);
+
+    // Withdraw
+    contributeToGoal(s, g.id, -1000);
+    expect(s.goals[0].currentAmount).toBe(7000);
+
+    // Update
+    updateGoal(s, g.id, { name: 'Avrupa Seyahati' });
+    expect(s.goals[0].name).toBe('Avrupa Seyahati');
+
+    // Remove
+    const removed = removeGoal(s, g.id);
+    expect(removed).toBe(true);
+    expect(s.goals.length).toBe(0);
+  });
+
+  it('setPin, verifyPin and removePin work reliably', () => {
+    expect(hasPin()).toBe(false);
+    expect(verifyPin('1234')).toBe(true); // no pin set
+
+    setPin('1905');
+    expect(hasPin()).toBe(true);
+    expect(verifyPin('1905')).toBe(true);
+    expect(verifyPin('1234')).toBe(false);
+
+    removePin();
+    expect(hasPin()).toBe(false);
   });
 });

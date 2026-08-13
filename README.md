@@ -15,20 +15,26 @@ npm test         # vitest birim testlerini çalıştırır
 ## ✨ Özellikler
 
 1. **Aylık Gelir/Gider Takibi & Net Bütçe:** Tek tıkla harcama veya gelir ekleme, silme ve düzenleme.
-2. **👁️ Gizlilik / Bakiye Gizleme Modu:** Toplu taşıma veya kalabalık yerlerde tek tıkla tüm parasal tutarları `₺••••` olarak maskeleme (`localStorage` kalıcı).
-3. **🧠 50/30/20 Bütçe Kuralı & Akıllı İçgörüler:** Harcamaları otomatik olarak İhtiyaçlar (%50), İstekler (%30) ve Tasarruf (%20) olarak sınıflandırıp görsel bar ve akıllı finansal tavsiyeler sunma.
-4. **🎨 Özel Kategori Yönetimi:** Kullanıcının dilediği ikon/emoji ve 50/30/20 sınıfı ile özel gelir/gider kategorileri tanımlayabilmesi.
-5. **⚡ Hızlı Tutar Çipleri:** İşlem ekleme ve düzenleme formlarında `+50`, `+100`, `+250`, `+500`, `+1.000` hızlı artırma butonları.
-6. **🌓 Manuel Tema Seçici:** Koyu, Açık veya Sistem temasını arayüzden tek tıkla değiştirebilme.
-7. **İşlem ve Tekrarlayan Düzenleme (Modal Edit):** Hatalı girilen tutarları, kategorileri, tarihleri veya artan kira/abonelik tutarlarını modal üzerinden doğrudan güncelleme.
-8. **Anlık Arama & Filtreleme:** Ayın işlemlerinde açıklamaya veya kategoriye göre anında filtreleme, Gider/Gelir/Tümü filtre sekmeleri.
-9. **Tasarruf / Birikim Oranı (%):** Gelirin yüzde kaçının tasarruf edildiğini gösteren dinamik istatistik kartı.
-10. **Excel / CSV Dışa Aktarma:** UTF-8 BOM destekli, Excel ve Numbers ile tam uyumlu Türkçe karakterli `.csv` rapor indirme.
-11. **JSON Yedekleme ve Geri Yükleme:** Cihazlar arası veya veri güvenliği için tam durum (state) yedekleme/yükleme.
-12. **Bütçe Limitleri & Uyarı Renkleri:** Kategori bazında limit koyma, %70 (uyarı), %90 (ciddi), %100 (kritik) ilerleme çubukları.
-13. **Tekrarlayan İşlemler (Idempotent):** Kira, maaş, abonelikleri ay bazında otomatik işleme ve dilediğinde aktif/pasif yapma.
-14. **Kategori Dağılımı & Trend Grafiği:** Bağımlılıksız SVG grafikler ile kategori kırılımı ve son 6 ayın gelir/gider çizgisi.
-15. **Akıllı Form Tarihi:** Geçmiş/gelecek ay incelenirken formun o aya göre akıllı açılması.
+2. **⚡ Akıllı Tek Satır Hızlı Giriş (Smart Quick Entry):** Doğal dil ile tek satırda işlem kaydetme (örn. `"market 350"`, `"kahve 85"`, `"maaş 65000"`).
+3. **🎯 Hedef Birikimler (Kumbara):** Tatil, acil durum fonu veya teknoloji için birikim hedefleri oluşturma, para ekleme/çekme ve ilerleme takibi.
+4. **📅 Aylık Harcama Isı Haritası (Calendar Heatmap):** Ayın günlerine göre harcama yoğunluğu görsel takvimi ve güne tıklayarak filtreleme.
+5. **📊 Yıllık Özet & Karşılaştırma Raporu (Annual Overview):** 12 ayın gelir/gider/tasarruf kümülatif tablosu ve yılın en çok harcanan ilk 5 kategorisi.
+6. **📥 CSV / Excel İçe Aktarma (Import Transactions):** Banka veya harici tablolardan `.csv` formatında toplu işlem yükleme.
+7. **🔒 PIN Kodu / Kilit Ekranı:** 4 haneli PIN ile uygulama açılışını kilitleme ve gizliliği koruma.
+8. **👁️ Gizlilik / Bakiye Gizleme Modu:** Toplu taşıma veya kalabalık yerlerde tek tıkla tüm parasal tutarları `₺••••` olarak maskeleme (`localStorage` kalıcı).
+9. **🧠 50/30/20 Bütçe Kuralı & Akıllı İçgörüler:** Harcamaları otomatik olarak İhtiyaçlar (%50), İstekler (%30) ve Tasarruf (%20) olarak sınıflandırıp görsel bar ve akıllı finansal tavsiyeler sunma.
+10. **🎨 Özel Kategori Yönetimi:** Kullanıcının dilediği ikon/emoji ve 50/30/20 sınıfı ile özel gelir/gider kategorileri tanımlayabilmesi.
+11. **⚡ Hızlı Tutar Çipleri:** İşlem ekleme ve düzenleme formlarında `+50`, `+100`, `+250`, `+500`, `+1.000` hızlı artırma butonları.
+12. **🌓 Manuel Tema Seçici:** Koyu, Açık veya Sistem temasını arayüzden tek tıkla değiştirebilme.
+13. **İşlem ve Tekrarlayan Düzenleme (Modal Edit):** Hatalı girilen tutarları, kategorileri, tarihleri veya artan kira/abonelik tutarlarını modal üzerinden doğrudan güncelleme.
+14. **Anlık Arama & Filtreleme:** Ayın işlemlerinde açıklamaya veya kategoriye göre anında filtreleme, Gider/Gelir/Tümü filtre sekmeleri.
+15. **Tasarruf / Birikim Oranı (%):** Gelirin yüzde kaçının tasarruf edildiğini gösteren dinamik istatistik kartı.
+16. **Excel / CSV Dışa Aktarma:** UTF-8 BOM destekli, Excel ve Numbers ile tam uyumlu Türkçe karakterli `.csv` rapor indirme.
+17. **JSON Yedekleme ve Geri Yükleme:** Cihazlar arası veya veri güvenliği için tam durum (state) yedekleme/yükleme.
+18. **Bütçe Limitleri & Uyarı Renkleri:** Kategori bazında limit koyma, %70 (uyarı), %90 (ciddi), %100 (kritik) ilerleme çubukları.
+19. **Tekrarlayan İşlemler (Idempotent):** Kira, maaş, abonelikleri ay bazında otomatik işleme ve dilediğinde aktif/pasif yapma.
+20. **Kategori Dağılımı & Trend Grafiği:** Bağımlılıksız SVG grafikler ile kategori kırılımı ve son 6 ayın gelir/gider çizgisi.
+21. **Akıllı Form Tarihi:** Geçmiş/gelecek ay incelenirken formun o aya göre akıllı açılması.
 
 ## Neden PWA (native değil)
 
@@ -131,6 +137,15 @@ Bu araç kişisel takip amaçlıdır; muhasebe veya vergi beyanı yerine geçmez
 ---
 
 ## 📝 Değişiklik Günlüğü (Changelog)
+
+### v0.4.0 (2026-08-14)
+- ⚡ **Akıllı Tek Satır Hızlı Giriş (Smart Quick Entry):** Doğal dil ile tek satırda işlem kaydetme (`"market 350"`, `"kahve 85"`, `"maaş 65000"` vb.) ve otomatik kategori eşleme.
+- 🎯 **Hedef Birikimler (Kumbara):** Hedef tanımlama, para ekleme (`+`) ve çekme (`-`), kalan süre ve hedef ilerleme çubuğu.
+- 📅 **Aylık Harcama Isı Haritası (Calendar Heatmap):** Ayın günlerine göre harcama yoğunluğu görsel takvimi ve güne tıklayarak o günün işlemlerini anında filtreleme.
+- 📊 **Yıllık Özet & Karşılaştırma Raporu (Annual Overview):** 12 ayın gelir/gider/tasarruf kümülatif tablosu ve yılın en çok harcanan ilk 5 kategorisi.
+- 📥 **CSV / Excel İçe Aktarma (Import Transactions):** Banka veya harici tablolardan `.csv` formatında toplu işlem yükleme.
+- 🔒 **PIN Kodu / Kilit Ekranı:** 4 haneli PIN ile uygulama açılışını kilitleme ve gizliliği koruma.
+- 🧪 **Genişletilmiş Test Kapsamı:** 20 birim testi ile %100 doğrulandı.
 
 ### v0.3.0 (2026-08-14)
 - 👁️ **Gizlilik / Bakiye Gizleme Modu:** Başlık alanındaki göz butonu ile tek tıkla tüm parasal tutarları `₺••••` olarak maskeleme ve `localStorage`'da tercihi hatırlama.

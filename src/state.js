@@ -21,6 +21,7 @@ function emptyState() {
     transactions: [],
     recurring: [],
     customCategories: [], // [{ id, type, name, icon, bucket, active }]
+    goals: [], // [{ id, name, targetAmount, currentAmount, targetDate, icon }]
     budgets: {}, // { [categoryId]: monthlyLimit }
     materialized: {}, // { "YYYY-MM": [recurringId, ...] }
     createdAt: now,
@@ -28,9 +29,25 @@ function emptyState() {
   };
 }
 
+function getStorage() {
+  try {
+    if (typeof localStorage !== 'undefined' && localStorage) return localStorage;
+  } catch {}
+  if (!globalThis._memStorage) {
+    const store = new Map();
+    globalThis._memStorage = {
+      getItem: (k) => (store.has(k) ? store.get(k) : null),
+      setItem: (k, v) => store.set(k, String(v)),
+      removeItem: (k) => store.delete(k),
+      clear: () => store.clear(),
+    };
+  }
+  return globalThis._memStorage;
+}
+
 function readRaw() {
   try {
-    return localStorage.getItem(KEY);
+    return getStorage().getItem(KEY);
   } catch {
     return null;
   }
@@ -58,6 +75,23 @@ function normalizeCustomCategory(c) {
     icon: typeof c.icon === 'string' && c.icon.trim() ? c.icon.trim() : '🏷️',
     bucket,
     active: c.active !== false,
+  };
+}
+
+function normalizeGoal(g) {
+  if (!g || typeof g !== 'object') return null;
+  if (typeof g.name !== 'string' || !g.name.trim()) return null;
+  const targetAmount = Number(g.targetAmount);
+  if (!Number.isFinite(targetAmount) || targetAmount <= 0) return null;
+  const currentAmount = Number(g.currentAmount);
+  return {
+    id: typeof g.id === 'string' && g.id ? g.id : `goal-${uid()}`,
+    name: g.name.trim(),
+    targetAmount,
+    currentAmount: Number.isFinite(currentAmount) && currentAmount >= 0 ? currentAmount : 0,
+    targetDate: typeof g.targetDate === 'string' && /^\d{4}-\d{2}(-\d{2})?$/.test(g.targetDate) ? g.targetDate : null,
+    icon: typeof g.icon === 'string' && g.icon.trim() ? g.icon.trim() : '🎯',
+    createdAt: typeof g.createdAt === 'string' ? g.createdAt : nowIso(),
   };
 }
 
@@ -117,6 +151,10 @@ export function normalize(input) {
     ? input.customCategories.map(normalizeCustomCategory).filter(Boolean)
     : [];
 
+  const goals = Array.isArray(input.goals)
+    ? input.goals.map(normalizeGoal).filter(Boolean)
+    : [];
+
   const budgets = {};
   if (input.budgets && typeof input.budgets === 'object') {
     for (const [categoryId, limit] of Object.entries(input.budgets)) {
@@ -139,6 +177,7 @@ export function normalize(input) {
     transactions,
     recurring,
     customCategories,
+    goals,
     budgets,
     materialized,
     createdAt: typeof input.createdAt === 'string' ? input.createdAt : base.createdAt,
@@ -155,7 +194,7 @@ export function load() {
 export function save(state) {
   state.updatedAt = nowIso();
   try {
-    localStorage.setItem(KEY, JSON.stringify(state));
+    getStorage().setItem(KEY, JSON.stringify(state));
     return true;
   } catch {
     return false;
@@ -286,6 +325,96 @@ export function updateCustomCategory(state, id, updates) {
   if (!normalized) return null;
   Object.assign(c, normalized);
   return c;
+}
+
+// ---------- Hedef Birikimler (Kumbara) ----------
+
+export function addGoal(state, input) {
+  const g = normalizeGoal({ ...input, id: `goal-${uid()}` });
+  if (!g) return null;
+  if (!state.goals) state.goals = [];
+  state.goals.push(g);
+  return g;
+}
+
+export function removeGoal(state, id) {
+  if (!state.goals) return false;
+  const idx = state.goals.findIndex((g) => g.id === id);
+  if (idx === -1) return false;
+  state.goals.splice(idx, 1);
+  return true;
+}
+
+export function updateGoal(state, id, updates) {
+  if (!state.goals) return null;
+  const g = state.goals.find((goal) => goal.id === id);
+  if (!g) return null;
+  const merged = { ...g, ...updates, id: g.id };
+  const normalized = normalizeGoal(merged);
+  if (!normalized) return null;
+  Object.assign(g, normalized);
+  return g;
+}
+
+export function contributeToGoal(state, id, delta) {
+  if (!state.goals) return null;
+  const g = state.goals.find((goal) => goal.id === id);
+  if (!g) return null;
+  const d = Number(delta);
+  if (!Number.isFinite(d)) return null;
+  g.currentAmount = Math.max(0, g.currentAmount + d);
+  return g;
+}
+
+// ---------- PIN Kodu / Kilit ----------
+
+const PIN_STORAGE_KEY = 'butceDefteri.pinHash';
+
+export function hasPin() {
+  try {
+    return Boolean(getStorage().getItem(PIN_STORAGE_KEY));
+  } catch {
+    return false;
+  }
+}
+
+export function setPin(pin) {
+  try {
+    if (!pin || pin.length < 4) return false;
+    let hash = 0;
+    for (let i = 0; i < pin.length; i += 1) {
+      hash = (hash << 5) - hash + pin.charCodeAt(i);
+      hash |= 0;
+    }
+    getStorage().setItem(PIN_STORAGE_KEY, String(hash));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export function verifyPin(pin) {
+  try {
+    const saved = getStorage().getItem(PIN_STORAGE_KEY);
+    if (!saved) return true;
+    let hash = 0;
+    for (let i = 0; i < pin.length; i += 1) {
+      hash = (hash << 5) - hash + pin.charCodeAt(i);
+      hash |= 0;
+    }
+    return String(hash) === saved;
+  } catch {
+    return false;
+  }
+}
+
+export function removePin() {
+  try {
+    getStorage().removeItem(PIN_STORAGE_KEY);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 export function serialize(state) {

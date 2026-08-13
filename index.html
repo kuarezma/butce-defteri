@@ -1,21 +1,20 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="tr">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <meta name="description" content="Aylık gelir gider takibi: kategori kırılımı, tekrarlayan işlemler, bütçe limitleri." />
-    <meta name="theme-color" content="#090a0f" />
-
-    <!-- iOS ana ekrana ekleme -->
+    <meta name="theme-color" content="#07090e" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="Bütçe" />
+    <link rel="icon" type="image/svg+xml" href="/icons/icon-192.svg" />
     <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+    <link rel="manifest" href="/manifest.webmanifest" />
 
-    <link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32.png" />
-    <link rel="icon" type="image/png" sizes="16x16" href="/icons/favicon-16.png" />
+    <title>Bütçe Defteri — Akıllı Gelir & Gider Takibi</title>
+    <meta name="description" content="Kişisel bütçe, gelir-gider, birikim hedefleri, 50/30/20 analizi ve tekrarlayan harcama takibi." />
 
-    <title>Bütçe Defteri — Kişisel Finans Yönetimi</title>
+    <!-- Google Fonts: Plus Jakarta Sans & Outfit -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Outfit:wght@500;600;700;800&display=swap" rel="stylesheet" />
@@ -37,8 +36,14 @@
             <button type="button" class="icon-btn" id="privacy-toggle-btn" aria-label="Gizlilik Modu" title="Bakiyeleri Gizle/Göster">
               <span id="privacy-icon"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg></span>
             </button>
+            <button type="button" class="icon-btn" id="annual-report-btn" aria-label="Yıllık Özet Raporu" title="Yıllık Özet & Karşılaştırma">
+              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" x2="18" y1="20" y2="10"/><line x1="12" x2="12" y1="20" y2="4"/><line x1="6" x2="6" y1="20" y2="14"/></svg>
+            </button>
             <button type="button" class="icon-btn" id="custom-cat-btn" aria-label="Özel Kategoriler" title="Özel Kategori Ekle/Yönet">
               <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2H2v10l9.29 9.29c.94.94 2.48.94 3.42 0l6.58-6.58c.94-.94.94-2.48 0-3.42L12 2Z"/><path d="M7 7h.01"/></svg>
+            </button>
+            <button type="button" class="icon-btn" id="pin-toggle-btn" aria-label="PIN Kilidi" title="PIN Kilidi Ayarla">
+              <span id="pin-icon"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/></svg></span>
             </button>
             <button type="button" class="icon-btn" id="theme-toggle-btn" aria-label="Tema Değiştir" title="Açık/Koyu Tema">
               <span id="theme-icon"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg></span>
@@ -107,12 +112,25 @@
       </header>
 
       <main class="dashboard" id="dashboard">
+        <!-- Akıllı Hızlı Giriş Çubuğu -->
+        <section class="card glass-card quick-entry-card">
+          <form id="quick-entry-form" class="quick-entry-form">
+            <div class="quick-entry-input-wrapper">
+              <span class="quick-entry-icon">
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+              </span>
+              <input type="text" id="quick-entry-input" placeholder="Akıllı hızlı giriş: ör. 'market 350', 'kahve 85', 'maaş 65000'..." autocomplete="off" />
+              <button type="submit" class="btn btn-primary btn-sm" id="quick-entry-btn">Hızlı Ekle</button>
+            </div>
+          </form>
+        </section>
+
         <!-- İşlem ekle -->
         <section class="card glass-card">
           <div class="card-head">
             <h2>
               <span class="card-head-icon"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14"/><path d="M12 5v14"/></svg></span>
-              İşlem Ekle
+              Detaylı İşlem Ekle
             </h2>
           </div>
           <form id="tx-form" class="tx-form">
@@ -184,6 +202,33 @@
           </div>
 
           <ul class="tx-list" id="tx-list"></ul>
+        </section>
+
+        <!-- 🎯 Hedef Birikimler (Kumbara) -->
+        <section class="card glass-card wide" id="goals-card-section">
+          <div class="card-head">
+            <h2>
+              <span class="card-head-icon"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg></span>
+              Hedef Birikimler (Kumbara)
+            </h2>
+            <button type="button" class="btn btn-sm btn-secondary" id="add-goal-btn">
+              <span>+ Yeni Hedef</span>
+            </button>
+          </div>
+          <p class="card-desc">Tatil, acil durum fonu veya teknoloji için birikim hedefleri oluştur ve ilerlemeyi takip et.</p>
+          <ul class="goals-list" id="goals-list"></ul>
+        </section>
+
+        <!-- 📅 Harcama Isı Haritası -->
+        <section class="card glass-card wide" id="heatmap-card-section">
+          <div class="card-head">
+            <h2>
+              <span class="card-head-icon"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="18" height="18" x="3" y="4" rx="2" ry="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/></svg></span>
+              Aylık Harcama Isı Haritası
+            </h2>
+          </div>
+          <p class="card-desc">Bu ayın günlerine göre harcama yoğunluğu dağılımı.</p>
+          <div id="heatmap-host" class="heatmap-host"></div>
         </section>
 
         <!-- Kategori dağılımı -->
@@ -292,15 +337,22 @@
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M8 13h2"/><path d="M14 13h2"/><path d="M8 17h2"/><path d="M14 17h2"/></svg>
             <span>Excel / CSV İndir</span>
           </button>
+          <button type="button" class="btn btn-secondary" id="import-csv-btn">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" x2="12" y1="3" y2="15"/></svg>
+            <span>CSV İçe Aktar</span>
+          </button>
+          <input type="file" id="import-csv-input" accept=".csv,text/csv" hidden />
+
           <button type="button" class="btn btn-secondary" id="export-btn">
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>
             <span>Yedek Al (JSON)</span>
           </button>
           <button type="button" class="btn btn-secondary" id="import-btn">
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" x2="12" y1="3" y2="15"/></svg>
-            <span>Yedekten Yükle</span>
+            <span>JSON Yükle</span>
           </button>
           <input type="file" id="import-input" accept="application/json,.json" hidden />
+
           <button type="button" class="btn btn-danger" id="reset-btn">
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
             <span>Tümünü Sıfırla</span>
@@ -308,7 +360,7 @@
         </div>
 
         <div class="confirm glass-confirm" id="reset-confirm" hidden>
-          <span>Tüm işlemler, tekrarlayanlar ve limitler silinecek. Emin misin?</span>
+          <span>Tüm işlemler, tekrarlayanlar, hedefler ve limitler silinecek. Emin misin?</span>
           <button type="button" class="btn btn-danger" data-action="reset-yes">Evet, sıfırla</button>
           <button type="button" class="btn btn-secondary" data-action="reset-no">Vazgeç</button>
         </div>
@@ -356,7 +408,7 @@
             <button type="button" class="chip-btn" data-add="100">+100</button>
             <button type="button" class="chip-btn" data-add="250">+250</button>
             <button type="button" class="chip-btn" data-add="500">+500</button>
-            <button type="button" class="chip-btn" data-add="1000">+1.000</button>
+            <button type="button" class="chip-btn" data-add="1000">+1000</button>
           </div>
 
           <label class="field">
@@ -466,6 +518,139 @@
         </form>
       </div>
     </dialog>
+
+    <!-- Birikim Hedefi Ekleme/Düzenleme Modalı -->
+    <dialog id="goal-dialog" class="glass-modal">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3>Yeni Birikim Hedefi</h3>
+          <button type="button" class="icon-btn close-btn" id="close-goal-dialog" aria-label="Kapat">
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+          </button>
+        </div>
+        <form id="goal-form" class="tx-form">
+          <div class="field-row">
+            <label class="field" style="max-width: 90px;">
+              <span>İkon</span>
+              <input type="text" name="icon" id="goal-icon" maxlength="4" placeholder="🏖️" value="🎯" required />
+            </label>
+            <label class="field">
+              <span>Hedef Adı</span>
+              <input type="text" name="name" id="goal-name" maxlength="50" placeholder="ör. Yaz Tatili Fonu" required />
+            </label>
+          </div>
+
+          <div class="field-row">
+            <label class="field">
+              <span>Hedef Tutar (₺)</span>
+              <input type="number" name="targetAmount" id="goal-target" min="1" step="1" placeholder="30000" required />
+            </label>
+            <label class="field">
+              <span>Mevcut Birikim (₺)</span>
+              <input type="number" name="currentAmount" id="goal-current" min="0" step="1" value="0" placeholder="0" />
+            </label>
+          </div>
+
+          <label class="field">
+            <span>Hedef Tarih (opsiyonel)</span>
+            <input type="date" name="targetDate" id="goal-date" />
+          </label>
+
+          <div class="modal-actions">
+            <button type="button" class="btn btn-secondary" id="cancel-goal-btn">İptal</button>
+            <button type="submit" class="btn btn-primary">Hedefi Kaydet</button>
+          </div>
+        </form>
+      </div>
+    </dialog>
+
+    <!-- Kumbaraya Para Ekle/Çek Modalı -->
+    <dialog id="goal-deposit-dialog" class="glass-modal">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3 id="goal-deposit-title">Hedefe Para Ekle</h3>
+          <button type="button" class="icon-btn close-btn" id="close-goal-deposit" aria-label="Kapat">
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+          </button>
+        </div>
+        <form id="goal-deposit-form" class="tx-form">
+          <input type="hidden" id="deposit-goal-id" />
+          <input type="hidden" id="deposit-goal-mode" value="deposit" />
+
+          <label class="field">
+            <span id="deposit-amount-label">Eklenecek Tutar (₺)</span>
+            <input type="number" id="deposit-goal-amount" min="1" step="1" placeholder="1000" required />
+          </label>
+
+          <div class="modal-actions">
+            <button type="button" class="btn btn-secondary" id="cancel-deposit-btn">İptal</button>
+            <button type="submit" class="btn btn-primary" id="submit-deposit-btn">Onayla</button>
+          </div>
+        </form>
+      </div>
+    </dialog>
+
+    <!-- Yıllık Özet Rapor Modalı -->
+    <dialog id="annual-dialog" class="glass-modal wide-modal">
+      <div class="modal-content">
+        <div class="modal-header">
+          <div class="annual-year-nav">
+            <button type="button" class="icon-btn" id="prev-year-btn" aria-label="Önceki yıl">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="m15 18-6-6 6-6"/></svg>
+            </button>
+            <h3 id="annual-year-label">2026 Yıllık Finans Özeti</h3>
+            <button type="button" class="icon-btn" id="next-year-btn" aria-label="Sonraki yıl">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="m9 18 6-6-6-6"/></svg>
+            </button>
+          </div>
+          <button type="button" class="icon-btn close-btn" id="close-annual-dialog" aria-label="Kapat">
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+          </button>
+        </div>
+        
+        <div id="annual-report-host"></div>
+      </div>
+    </dialog>
+
+    <!-- PIN Kilidi Ayar Modalı -->
+    <dialog id="pin-dialog" class="glass-modal">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3>PIN Kilidi Ayarları</h3>
+          <button type="button" class="icon-btn close-btn" id="close-pin-dialog" aria-label="Kapat">
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+          </button>
+        </div>
+        <form id="pin-form" class="tx-form">
+          <p class="card-desc" id="pin-status-desc">Uygulama açılışında gizlilik için 4 haneli PIN kodu belirleyin.</p>
+          
+          <label class="field">
+            <span>4 Haneli PIN</span>
+            <input type="password" inputmode="numeric" pattern="[0-9]*" maxlength="4" id="pin-input" placeholder="••••" required />
+          </label>
+
+          <div class="modal-actions">
+            <button type="button" class="btn btn-danger" id="remove-pin-btn" hidden>Kilidi Kaldır</button>
+            <button type="button" class="btn btn-secondary" id="cancel-pin-btn">İptal</button>
+            <button type="submit" class="btn btn-primary" id="save-pin-btn">PIN Kaydet</button>
+          </div>
+        </form>
+      </div>
+    </dialog>
+
+    <!-- PIN Kilit Ekranı (Overlay) -->
+    <div id="pin-lock-overlay" class="pin-lock-overlay" hidden>
+      <div class="lock-box glass-card">
+        <span class="lock-icon"><svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></span>
+        <h2>Bütçe Defteri Kilitli</h2>
+        <p>Devam etmek için 4 haneli PIN kodunu giriniz.</p>
+        <form id="pin-unlock-form">
+          <input type="password" inputmode="numeric" pattern="[0-9]*" maxlength="4" id="pin-unlock-input" placeholder="••••" autofocus autocomplete="off" />
+          <button type="submit" class="btn btn-primary btn-block">Kilidi Aç</button>
+          <p id="pin-error-msg" class="pin-error" hidden>Hatalı PIN, lütfen tekrar deneyin.</p>
+        </form>
+      </div>
+    </div>
 
     <script type="module" src="/src/main.js"></script>
   </body>
