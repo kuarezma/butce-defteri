@@ -9,7 +9,21 @@ npm install
 npm run dev      # geliştirme
 npm run build    # dist/ üretir — PWA manifest + service worker dahil
 npm run preview  # üretim çıktısını yerelde dener
+npm test         # vitest birim testlerini çalıştırır
 ```
+
+## ✨ Özellikler
+
+1. **Aylık Gelir/Gider Takibi & Net Bütçe:** Tek tıkla harcama veya gelir ekleme, silme ve düzenleme.
+2. **İşlem ve Tekrarlayan Düzenleme (Modal Edit):** Hatalı girilen tutarları, kategorileri, tarihleri veya artan kira/abonelik tutarlarını modal üzerinden doğrudan güncelleme.
+3. **Anlık Arama & Filtreleme:** Ayın işlemlerinde açıklamaya veya kategoriye göre anında filtreleme, Gider/Gelir/Tümü filtre sekmeleri.
+4. **Tasarruf / Birikim Oranı (%):** Gelirin yüzde kaçının tasarruf edildiğini gösteren dinamik istatistik kartı.
+5. **Excel / CSV Dışa Aktarma:** UTF-8 BOM destekli, Excel ve Numbers ile tam uyumlu Türkçe karakterli `.csv` rapor indirme.
+6. **JSON Yedekleme ve Geri Yükleme:** Cihazlar arası veya veri güvenliği için tam durum (state) yedekleme/yükleme.
+7. **Bütçe Limitleri & Uyarı Renkleri:** Kategori bazında limit koyma, %70 (uyarı), %90 (ciddi), %100 (kritik) ilerleme çubukları.
+8. **Tekrarlayan İşlemler (Idempotent):** Kira, maaş, abonelikleri ay bazında otomatik işleme ve dilediğinde aktif/pasif yapma.
+9. **Kategori Dağılımı & Trend Grafiği:** Bağımlılıksız SVG grafikler ile kategori kırılımı ve son 6 ayın gelir/gider çizgisi.
+10. **Akıllı Form Tarihi:** Geçmiş/gelecek ay incelenirken formun o aya göre akıllı açılması.
 
 ## Neden PWA (native değil)
 
@@ -76,10 +90,12 @@ bu yüzden çekirdek özellik, süs değil.
 | `src/data/categories.js` | Kategori tanımları — tek kaynak, kalıcı id'ler |
 | `src/palette.js` | Sabit renk sırası (dataviz iskeletinin referans paleti) |
 | `src/state.js` | Şema versiyonlu depolama, doğrulama, materyalizasyon |
-| `src/compute.js` | Aylık toplam, kategori kırılımı, trend, bütçe durumu — DOM'a bakmaz |
+| `src/compute.js` | Aylık toplam, kategori kırılımı, trend, bütçe durumu, tasarruf oranı — DOM'a bakmaz |
 | `src/charts.js` | Bağımlılıksız SVG grafikler (sıralı çubuk, çizgi) + hover/tooltip |
 | `src/render.js` | Veriden DOM üretimi |
-| `src/main.js` | Olay bağlama, ay gezinme, yedek al/yükle |
+| `src/export.js` | Excel / Numbers uyumlu CSV dışa aktarma |
+| `src/main.js` | Olay bağlama, ay gezinme, arama/filtre, düzenleme modalleri, yedek al/yükle |
+| `tests/` | Vitest ile yazılmış `state` ve `compute` birim testleri |
 | `vite.config.js` | PWA manifest + service worker (`vite-plugin-pwa`) |
 
 ## Grafik tasarımı
@@ -98,6 +114,7 @@ klavye odağıyla da çalışır.
 - Segmented kontroller `role="radiogroup"` + `aria-checked`.
 - Grafik satırları `tabindex="0"` ile klavyeden erişilebilir; odaklanınca
   aynı tooltip gösterilir.
+- Modaller standart `<dialog>` ve `aria-label` etiketleri ile erişilebilirdir.
 - `prefers-reduced-motion` geçişleri kapatır.
 - Açık/koyu tema OS tercihine göre otomatik (`prefers-color-scheme`).
 
@@ -105,3 +122,16 @@ klavye odağıyla da çalışır.
 
 Sunucu yok, hesap yok, cihazlar arası senkron yok. Tek cihaz, açık yedek.
 Bu araç kişisel takip amaçlıdır; muhasebe veya vergi beyanı yerine geçmez.
+
+---
+
+## 📝 Değişiklik Günlüğü (Changelog)
+
+### v0.2.0 (2026-08-14)
+- 🚀 **İşlem Düzenleme:** Yanlış girilen işlemleri doğrudan modal üzerinden tutar, tarih, kategori ve not bazında güncelleyebilme.
+- 🚀 **Tekrarlayan İşlem Düzenleme:** Kira ve abonelik gibi tekrarlayan işlemlerin tutar/gün/ad bilgilerini güncelleyebilme.
+- 🚀 **Arama & Hızlı Filtre:** İşlem listesinde metin araması ve Gider/Gelir tür filtresi.
+- 🚀 **Tasarruf / Birikim Oranı:** Üst bilgi paneline dinamik `% (Gelir - Gider) / Gelir` oran kartı.
+- 🚀 **Excel / CSV Dışa Aktarma:** UTF-8 BOM destekli, Türkçe karakterlerle tam uyumlu `.csv` indirme.
+- 🛠️ **Akıllı Tarih:** Geçmiş veya gelecek ay seçildiğinde form tarihinin o aya göre otomatik ayarlanması.
+- 🧪 **Otomatik Testler:** `state` ve `compute` saf fonksiyonları için Vitest birim test paketi (12 test).

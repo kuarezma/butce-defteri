@@ -157,6 +157,16 @@ export function removeTransaction(state, id) {
   return true;
 }
 
+export function updateTransaction(state, id, updates) {
+  const t = state.transactions.find((tx) => tx.id === id);
+  if (!t) return null;
+  const merged = { ...t, ...updates, id: t.id, createdAt: t.createdAt };
+  const normalized = normalizeTransaction(merged);
+  if (!normalized) return null;
+  Object.assign(t, normalized);
+  return t;
+}
+
 export function transactionsInMonth(state, periodKey) {
   return state.transactions.filter((t) => t.date.startsWith(periodKey));
 }
@@ -175,6 +185,16 @@ export function removeRecurring(state, id) {
   if (idx === -1) return false;
   state.recurring.splice(idx, 1);
   return true;
+}
+
+export function updateRecurring(state, id, updates) {
+  const r = state.recurring.find((rec) => rec.id === id);
+  if (!r) return null;
+  const merged = { ...r, ...updates, id: r.id };
+  const normalized = normalizeRecurring(merged);
+  if (!normalized) return null;
+  Object.assign(r, normalized);
+  return r;
 }
 
 export function setRecurringActive(state, id, active) {

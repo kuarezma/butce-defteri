@@ -1,5 +1,6 @@
 import { CATEGORIES, categoriesByType, categoryById } from './data/categories.js';
 import { rankedBarChart, trendLineChart } from './charts.js';
+import { getIcon } from './icons.js';
 
 const fmt = new Intl.NumberFormat('tr-TR', { maximumFractionDigits: 0 });
 export const money = (n) => `₺${fmt.format(n)}`;
@@ -45,11 +46,16 @@ export function fillBudgetCategorySelect(select) {
 
 // ---------- Üst bilgi ----------
 
-export function renderStats(elements, totals, avgExpense) {
+export function renderStats(elements, totals, avgExpense, savingsPct) {
   elements.income.textContent = money(totals.income);
   elements.expense.textContent = money(totals.expense);
   elements.net.textContent = money(totals.net);
   elements.netTile.dataset.sign = totals.net >= 0 ? 'positive' : 'negative';
+
+  if (elements.savings && elements.savingsTile) {
+    elements.savings.textContent = `%${savingsPct}`;
+    elements.savingsTile.dataset.sign = savingsPct > 0 ? 'positive' : savingsPct < 0 ? 'negative' : 'neutral';
+  }
 
   elements.avgLine.textContent = avgExpense > 0
     ? `Son 3 ayın ortalama gideri: ${money(avgExpense)} — acil durum fonu hedefini buna göre kur.`
@@ -58,15 +64,38 @@ export function renderStats(elements, totals, avgExpense) {
 
 // ---------- İşlem listesi ----------
 
-export function renderTransactionList(container, badge, transactions) {
-  badge.textContent = `${transactions.length} işlem`;
+export function renderTransactionList(container, badge, transactions, options = {}) {
+  const { search = '', filter = 'all' } = options;
+  const q = search.trim().toLowerCase();
+
+  let filtered = [...transactions];
+  if (filter !== 'all') {
+    filtered = filtered.filter((t) => t.type === filter);
+  }
+  if (q) {
+    filtered = filtered.filter((t) => {
+      const cat = categoryById(t.categoryId);
+      const catName = (cat ? cat.name : '').toLowerCase();
+      const note = (t.note || '').toLowerCase();
+      return catName.includes(q) || note.includes(q);
+    });
+  }
+
+  badge.textContent = (q || filter !== 'all')
+    ? `${filtered.length} / ${transactions.length} işlem`
+    : `${transactions.length} işlem`;
 
   if (transactions.length === 0) {
-    container.innerHTML = '<li class="empty-row">Bu ay henüz işlem yok.</li>';
+    container.innerHTML = '<li class="empty-row">Bu ay henüz işlem bulunmuyor. Eklemek için formu kullanabilirsin.</li>';
     return;
   }
 
-  const sorted = [...transactions].sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
+  if (filtered.length === 0) {
+    container.innerHTML = '<li class="empty-row">Arama kriterine uygun işlem bulunamadı.</li>';
+    return;
+  }
+
+  const sorted = filtered.sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
 
   container.innerHTML = sorted.map((t) => {
     const cat = categoryById(t.categoryId) || { icon: '❔', name: 'Bilinmeyen' };
@@ -79,7 +108,10 @@ export function renderTransactionList(container, badge, transactions) {
           <div class="tx-sub">${esc(fmtDate(t.date))}${t.note ? ` · ${esc(t.note)}` : ''}${t.recurringId ? ' · tekrarlayan' : ''}</div>
         </div>
         <span class="tx-amount" data-type="${t.type}">${sign}${esc(money(t.amount))}</span>
-        <button type="button" class="row-delete" data-delete-tx="${esc(t.id)}" aria-label="İşlemi sil">✕</button>
+        <div class="row-actions">
+          <button type="button" class="row-edit" data-edit-tx="${esc(t.id)}" aria-label="İşlemi düzenle">${getIcon('edit')}</button>
+          <button type="button" class="row-delete" data-delete-tx="${esc(t.id)}" aria-label="İşlemi sil">${getIcon('trash')}</button>
+        </div>
       </li>`;
   }).join('');
 }
@@ -151,8 +183,11 @@ export function renderRecurringList(container, list) {
           <div class="tx-sub">${esc(cat.name)} · her ayın ${r.day}. günü</div>
         </div>
         <span class="tx-amount" data-type="${r.type}">${sign}${esc(money(r.amount))}</span>
-        <button type="button" class="row-delete" data-toggle-recurring="${esc(r.id)}" aria-label="${r.active ? 'Pasifleştir' : 'Aktifleştir'}">${r.active ? '⏸' : '▶'}</button>
-        <button type="button" class="row-delete" data-delete-recurring="${esc(r.id)}" aria-label="Tekrarlayan işlemi sil">✕</button>
+        <div class="row-actions">
+          <button type="button" class="row-edit" data-edit-recurring="${esc(r.id)}" aria-label="Tekrarlayan işlemi düzenle">${getIcon('edit')}</button>
+          <button type="button" class="row-delete" data-toggle-recurring="${esc(r.id)}" aria-label="${r.active ? 'Pasifleştir' : 'Aktifleştir'}">${r.active ? getIcon('pause') : getIcon('play')}</button>
+          <button type="button" class="row-delete" data-delete-recurring="${esc(r.id)}" aria-label="Tekrarlayan işlemi sil">${getIcon('trash')}</button>
+        </div>
       </li>`;
   }).join('');
 }

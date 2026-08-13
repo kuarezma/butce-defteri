@@ -1,23 +1,26 @@
 import './style.css';
 import {
   load, save, normalize, serialize,
-  addTransaction, removeTransaction, transactionsInMonth,
-  addRecurring, removeRecurring, setRecurringActive, materializeRecurring,
+  addTransaction, removeTransaction, updateTransaction, transactionsInMonth,
+  addRecurring, removeRecurring, updateRecurring, setRecurringActive, materializeRecurring,
   setBudget,
   periodKey, shiftPeriod,
 } from './state.js';
 import {
-  monthTotals, categoryBreakdown, trendSeries, budgetStatus, trailingAverageExpense,
+  monthTotals, categoryBreakdown, trendSeries, budgetStatus, trailingAverageExpense, savingsRate,
 } from './compute.js';
 import {
   fillCategorySelect, fillBudgetCategorySelect,
   renderStats, renderTransactionList, renderCategoryChart, renderTrendChart,
   renderBudgetList, renderRecurringList, monthLabel,
 } from './render.js';
+import { transactionsToCsv, downloadCsv } from './export.js';
 
 const state = load();
 let currentPeriod = periodKey();
 let categoryChartType = 'expense';
+let txSearchQuery = '';
+let txTypeFilter = 'all';
 
 // Ay açılınca o aya tanımlı tekrarlayanları işle (idempotent).
 if (materializeRecurring(state, currentPeriod) > 0) save(state);
@@ -30,6 +33,8 @@ const els = {
   expense: document.getElementById('stat-expense'),
   net: document.getElementById('stat-net'),
   netTile: document.getElementById('stat-net-tile'),
+  savings: document.getElementById('stat-savings'),
+  savingsTile: document.getElementById('stat-savings-tile'),
   avgLine: document.getElementById('avg-line'),
 
   txForm: document.getElementById('tx-form'),
@@ -37,6 +42,8 @@ const els = {
   txCategory: document.getElementById('tx-category'),
   txList: document.getElementById('tx-list'),
   txCountBadge: document.getElementById('tx-count-badge'),
+  txSearchInput: document.getElementById('tx-search-input'),
+  txFilterGroup: document.getElementById('tx-filter-group'),
 
   categoryChartHost: document.getElementById('category-chart'),
   trendChartHost: document.getElementById('trend-chart'),
@@ -50,6 +57,30 @@ const els = {
   recCategory: document.getElementById('rec-category'),
   recurringList: document.getElementById('recurring-list'),
 
+  // Edit Modalleri
+  editTxDialog: document.getElementById('edit-tx-dialog'),
+  editTxForm: document.getElementById('edit-tx-form'),
+  editTxId: document.getElementById('edit-tx-id'),
+  editTxType: document.getElementById('edit-tx-type'),
+  editTxAmount: document.getElementById('edit-tx-amount'),
+  editTxDate: document.getElementById('edit-tx-date'),
+  editTxCategory: document.getElementById('edit-tx-category'),
+  editTxNote: document.getElementById('edit-tx-note'),
+  closeEditTx: document.getElementById('close-edit-tx'),
+  cancelEditTx: document.getElementById('cancel-edit-tx'),
+
+  editRecDialog: document.getElementById('edit-rec-dialog'),
+  editRecForm: document.getElementById('edit-rec-form'),
+  editRecId: document.getElementById('edit-rec-id'),
+  editRecType: document.getElementById('edit-rec-type'),
+  editRecName: document.getElementById('edit-rec-name'),
+  editRecAmount: document.getElementById('edit-rec-amount'),
+  editRecDay: document.getElementById('edit-rec-day'),
+  editRecCategory: document.getElementById('edit-rec-category'),
+  closeEditRec: document.getElementById('close-edit-rec'),
+  cancelEditRec: document.getElementById('cancel-edit-rec'),
+
+  exportCsvBtn: document.getElementById('export-csv-btn'),
   exportBtn: document.getElementById('export-btn'),
   importBtn: document.getElementById('import-btn'),
   importInput: document.getElementById('import-input'),
@@ -72,6 +103,12 @@ function persist() {
   }
 }
 
+function getDefaultDateForPeriod(period) {
+  const todayIso = new Date().toISOString().slice(0, 10);
+  if (todayIso.startsWith(period)) return todayIso;
+  return `${period}-01`;
+}
+
 // ---------- Segmented kontrol yardımcı ----------
 
 function wireSegmented(root, hiddenInput, onChange) {
@@ -87,6 +124,15 @@ function wireSegmented(root, hiddenInput, onChange) {
   });
 }
 
+function setSegmentedValue(root, hiddenInput, value) {
+  hiddenInput.value = value;
+  root.querySelectorAll('.seg-btn').forEach((b) => {
+    const match = b.dataset.type === value;
+    b.classList.toggle('is-active', match);
+    b.setAttribute('aria-checked', String(match));
+  });
+}
+
 // ---------- Ana çizim ----------
 
 function paint() {
@@ -94,9 +140,13 @@ function paint() {
 
   const totals = monthTotals(state, currentPeriod);
   const avg = trailingAverageExpense(state, currentPeriod);
-  renderStats(els, totals, avg);
+  const sRate = savingsRate(totals);
+  renderStats(els, totals, avg, sRate);
 
-  renderTransactionList(els.txList, els.txCountBadge, transactionsInMonth(state, currentPeriod));
+  renderTransactionList(els.txList, els.txCountBadge, transactionsInMonth(state, currentPeriod), {
+    search: txSearchQuery,
+    filter: txTypeFilter,
+  });
 
   const rows = categoryBreakdown(state, currentPeriod, categoryChartType);
   renderCategoryChart(els.categoryChartHost, rows, categoryChartType);
@@ -110,6 +160,7 @@ function paint() {
 fillCategorySelect(els.txCategory, 'expense');
 fillCategorySelect(els.recCategory, 'expense');
 fillBudgetCategorySelect(els.budgetCategory);
+els.txForm.date.value = getDefaultDateForPeriod(currentPeriod);
 paint();
 
 // ---------- Ay gezinme ----------
@@ -117,23 +168,50 @@ paint();
 els.prevMonth.addEventListener('click', () => {
   currentPeriod = shiftPeriod(currentPeriod, -1);
   if (materializeRecurring(state, currentPeriod) > 0) persist();
+  els.txForm.date.value = getDefaultDateForPeriod(currentPeriod);
   paint();
 });
 
 els.nextMonth.addEventListener('click', () => {
   currentPeriod = shiftPeriod(currentPeriod, 1);
   if (materializeRecurring(state, currentPeriod) > 0) persist();
+  els.txForm.date.value = getDefaultDateForPeriod(currentPeriod);
   paint();
 });
+
+// ---------- Arama ve Filtreleme ----------
+
+if (els.txSearchInput) {
+  els.txSearchInput.addEventListener('input', (event) => {
+    txSearchQuery = event.target.value;
+    renderTransactionList(els.txList, els.txCountBadge, transactionsInMonth(state, currentPeriod), {
+      search: txSearchQuery,
+      filter: txTypeFilter,
+    });
+  });
+}
+
+if (els.txFilterGroup) {
+  els.txFilterGroup.addEventListener('click', (event) => {
+    const btn = event.target.closest('.seg-btn');
+    if (!btn) return;
+    els.txFilterGroup.querySelectorAll('.seg-btn').forEach((b) => {
+      b.classList.toggle('is-active', b === btn);
+      b.setAttribute('aria-checked', String(b === btn));
+    });
+    txTypeFilter = btn.dataset.filter;
+    renderTransactionList(els.txList, els.txCountBadge, transactionsInMonth(state, currentPeriod), {
+      search: txSearchQuery,
+      filter: txTypeFilter,
+    });
+  });
+}
 
 // ---------- İşlem ekleme ----------
 
 wireSegmented(els.txForm.querySelector('.segmented'), els.txType, (type) => {
   fillCategorySelect(els.txCategory, type);
 });
-
-// Varsayılan tarih: bugün, ama görüntülenen ay içinde kalınırsa ayın 1'i.
-els.txForm.date.value = new Date().toISOString().slice(0, 10);
 
 els.txForm.addEventListener('submit', (event) => {
   event.preventDefault();
@@ -155,23 +233,74 @@ els.txForm.addEventListener('submit', (event) => {
   if (addedPeriod !== currentPeriod) currentPeriod = addedPeriod;
   paint();
   els.txForm.reset();
-  els.txForm.date.value = new Date().toISOString().slice(0, 10);
+  els.txForm.date.value = getDefaultDateForPeriod(currentPeriod);
   fillCategorySelect(els.txCategory, 'expense');
-  els.txForm.querySelectorAll('.seg-btn').forEach((b) => {
-    b.classList.toggle('is-active', b.dataset.type === 'expense');
-    b.setAttribute('aria-checked', String(b.dataset.type === 'expense'));
-  });
-  els.txType.value = 'expense';
+  setSegmentedValue(els.txForm.querySelector('.segmented'), els.txType, 'expense');
   status('İşlem eklendi.');
 });
 
+// ---------- İşlem Silme ve Düzenleme ----------
+
 els.txList.addEventListener('click', (event) => {
-  const btn = event.target.closest('[data-delete-tx]');
-  if (!btn) return;
-  removeTransaction(state, btn.dataset.deleteTx);
+  const deleteBtn = event.target.closest('[data-delete-tx]');
+  const editBtn = event.target.closest('[data-edit-tx]');
+
+  if (deleteBtn) {
+    removeTransaction(state, deleteBtn.dataset.deleteTx);
+    persist();
+    paint();
+    status('İşlem silindi.');
+    return;
+  }
+
+  if (editBtn) {
+    const id = editBtn.dataset.editTx;
+    const t = state.transactions.find((tx) => tx.id === id);
+    if (!t) return;
+
+    els.editTxId.value = t.id;
+    setSegmentedValue(els.editTxForm.querySelector('.segmented'), els.editTxType, t.type);
+    fillCategorySelect(els.editTxCategory, t.type);
+    els.editTxCategory.value = t.categoryId;
+    els.editTxAmount.value = t.amount;
+    els.editTxDate.value = t.date;
+    els.editTxNote.value = t.note || '';
+
+    if (els.editTxDialog.showModal) els.editTxDialog.showModal();
+    else els.editTxDialog.setAttribute('open', '');
+  }
+});
+
+wireSegmented(els.editTxForm.querySelector('.segmented'), els.editTxType, (type) => {
+  fillCategorySelect(els.editTxCategory, type);
+});
+
+els.closeEditTx.addEventListener('click', () => els.editTxDialog.close());
+els.cancelEditTx.addEventListener('click', () => els.editTxDialog.close());
+
+els.editTxForm.addEventListener('submit', (event) => {
+  event.preventDefault();
+  const id = els.editTxId.value;
+  const form = new FormData(els.editTxForm);
+  const updated = updateTransaction(state, id, {
+    type: form.get('type'),
+    amount: form.get('amount'),
+    categoryId: form.get('categoryId'),
+    date: form.get('date'),
+    note: form.get('note'),
+  });
+
+  if (!updated) {
+    status('Güncelleme başarısız oldu — alanları kontrol et.', 'error');
+    return;
+  }
+
   persist();
+  const updatedPeriod = updated.date.slice(0, 7);
+  if (updatedPeriod !== currentPeriod) currentPeriod = updatedPeriod;
   paint();
-  status('İşlem silindi.');
+  els.editTxDialog.close();
+  status('İşlem başarıyla güncellendi.');
 });
 
 // ---------- Kategori grafiği geçişi ----------
@@ -235,17 +364,17 @@ els.recurringForm.addEventListener('submit', (event) => {
   els.recurringForm.reset();
   els.recurringForm.day.value = '1';
   fillCategorySelect(els.recCategory, 'expense');
-  els.recurringForm.querySelectorAll('.seg-btn').forEach((b) => {
-    b.classList.toggle('is-active', b.dataset.type === 'expense');
-    b.setAttribute('aria-checked', String(b.dataset.type === 'expense'));
-  });
-  els.recType.value = 'expense';
+  setSegmentedValue(els.recurringForm.querySelector('.segmented'), els.recType, 'expense');
   status('Tekrarlayan işlem eklendi.');
 });
+
+// ---------- Tekrarlayan Düzenleme ve İşlemler ----------
 
 els.recurringList.addEventListener('click', (event) => {
   const del = event.target.closest('[data-delete-recurring]');
   const toggle = event.target.closest('[data-toggle-recurring]');
+  const edit = event.target.closest('[data-edit-recurring]');
+
   if (del) {
     removeRecurring(state, del.dataset.deleteRecurring);
     persist();
@@ -259,8 +388,67 @@ els.recurringList.addEventListener('click', (event) => {
       renderRecurringList(els.recurringList, state.recurring);
       status(r.active ? 'Tekrarlayan işlem aktifleştirildi.' : 'Tekrarlayan işlem pasifleştirildi.');
     }
+  } else if (edit) {
+    const r = state.recurring.find((x) => x.id === edit.dataset.editRecurring);
+    if (!r) return;
+
+    els.editRecId.value = r.id;
+    setSegmentedValue(els.editRecForm.querySelector('.segmented'), els.editRecType, r.type);
+    fillCategorySelect(els.editRecCategory, r.type);
+    els.editRecCategory.value = r.categoryId;
+    els.editRecName.value = r.name;
+    els.editRecAmount.value = r.amount;
+    els.editRecDay.value = r.day;
+
+    if (els.editRecDialog.showModal) els.editRecDialog.showModal();
+    else els.editRecDialog.setAttribute('open', '');
   }
 });
+
+wireSegmented(els.editRecForm.querySelector('.segmented'), els.editRecType, (type) => {
+  fillCategorySelect(els.editRecCategory, type);
+});
+
+els.closeEditRec.addEventListener('click', () => els.editRecDialog.close());
+els.cancelEditRec.addEventListener('click', () => els.editRecDialog.close());
+
+els.editRecForm.addEventListener('submit', (event) => {
+  event.preventDefault();
+  const id = els.editRecId.value;
+  const form = new FormData(els.editRecForm);
+  const updated = updateRecurring(state, id, {
+    name: form.get('name'),
+    type: form.get('type'),
+    amount: form.get('amount'),
+    day: form.get('day'),
+    categoryId: form.get('categoryId'),
+  });
+
+  if (!updated) {
+    status('Tekrarlayan işlem güncellenemedi — alanları kontrol et.', 'error');
+    return;
+  }
+
+  persist();
+  paint();
+  els.editRecDialog.close();
+  status('Tekrarlayan işlem güncellendi.');
+});
+
+// ---------- CSV Dışa Aktarma ----------
+
+if (els.exportCsvBtn) {
+  els.exportCsvBtn.addEventListener('click', () => {
+    if (state.transactions.length === 0) {
+      status('Dışa aktarılacak işlem bulunmuyor.', 'error');
+      return;
+    }
+    const stamp = new Date().toISOString().slice(0, 10);
+    const csvData = transactionsToCsv(state.transactions);
+    downloadCsv(csvData, `butce-defteri-${stamp}.csv`);
+    status('İşlemler Excel/CSV olarak indirildi.');
+  });
+}
 
 // ---------- Yedek al / yükle / sıfırla ----------
 

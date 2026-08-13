@@ -1,11 +1,5 @@
 /**
- * Bağımlılıksız SVG grafikler. dataviz iskeletinin mark spec'lerine uyar:
- * çubuk uçları 4px yuvarlak / tabanda kare, çizgi 2px, işaretçi ≥8px,
- * ızgara 1px düz, seri rengi metne değil işarete uygulanır.
- *
- * Her çizici { svg, attach(container) } döner — attach hover/tooltip/crosshair
- * katmanını bağlar. Tooltip her zaman aynı değeri direct label ile de taşır;
- * hover yalnızca zenginleştirir, hiçbir veriyi hover'a kilitlemez.
+ * Bağımlılıksız SVG grafikler — Modern Luminous & Gradient Stilleme.
  */
 
 const fmt = new Intl.NumberFormat('tr-TR', { maximumFractionDigits: 0 });
@@ -50,7 +44,7 @@ function showTooltip(x, y, rows) {
       line.appendChild(key);
     }
     const val = document.createElement('strong');
-    val.textContent = row.value; // untrusted veri — textContent
+    val.textContent = row.value;
     const label = document.createElement('span');
     label.textContent = row.label;
     line.append(val, label);
@@ -69,13 +63,13 @@ function hideTooltip() {
 
 export function rankedBarChart(rows, { hue, emptyText }) {
   const width = 560;
-  const rowH = 34;
-  const barH = 20; // ≤24px spec
-  const labelW = 150;
-  const gap = 2; // surface gap
+  const rowH = 38;
+  const barH = 22;
+  const labelW = 160;
+  const gap = 3;
   const height = Math.max(rows.length, 1) * rowH + 12;
   const max = niceMax(Math.max(...rows.map((r) => r.amount), 1));
-  const plotW = width - labelW - 70;
+  const plotW = width - labelW - 80;
 
   if (rows.length === 0) {
     return { svg: `<div class="chart-empty">${esc(emptyText)}</div>`, attach() {} };
@@ -84,15 +78,15 @@ export function rankedBarChart(rows, { hue, emptyText }) {
   let bars = '';
   rows.forEach((row, i) => {
     const y = i * rowH + gap;
-    const w = Math.max((row.amount / max) * plotW, 2);
+    const w = Math.max((row.amount / max) * plotW, 4);
     const cx = labelW;
     bars += `
       <g class="bar-row" data-i="${i}" tabindex="0" role="img"
          aria-label="${esc(row.category.name)}: ${esc(money(row.amount))}">
-        <text x="${labelW - 10}" y="${y + barH / 2 + 4}" text-anchor="end" class="bar-label">${esc(row.category.icon)} ${esc(row.category.name)}</text>
+        <text x="${labelW - 12}" y="${y + barH / 2 + 5}" text-anchor="end" class="bar-label">${esc(row.category.icon)} ${esc(row.category.name)}</text>
         <rect class="bar-hit" x="${cx}" y="${y}" width="${plotW}" height="${barH}" fill="transparent" />
-        <rect class="bar-fill" x="${cx}" y="${y}" width="${w}" height="${barH}" rx="4" ry="4" fill="var(--series-${hue})" />
-        <text x="${cx + w + 8}" y="${y + barH / 2 + 4}" class="bar-value">${esc(money(row.amount))}</text>
+        <rect class="bar-fill" x="${cx}" y="${y}" width="${w}" height="${barH}" rx="6" ry="6" fill="var(--series-${hue})" />
+        <text x="${cx + w + 10}" y="${y + barH / 2 + 5}" class="bar-value">${esc(money(row.amount))}</text>
       </g>`;
   });
 
@@ -129,15 +123,15 @@ export function rankedBarChart(rows, { hue, emptyText }) {
   };
 }
 
-// ---------- Aylık gelir/gider trendi (çizgi) ----------
+// ---------- Aylık gelir/gider trendi (çizgi + alan gradyanı) ----------
 
 export function trendLineChart(series, monthLabelFn) {
   const width = 560;
-  const height = 220;
-  const padL = 46;
-  const padR = 14;
-  const padT = 14;
-  const padB = 28;
+  const height = 230;
+  const padL = 48;
+  const padR = 16;
+  const padT = 16;
+  const padB = 30;
   const plotW = width - padL - padR;
   const plotH = height - padT - padB;
 
@@ -153,14 +147,24 @@ export function trendLineChart(series, monthLabelFn) {
   const gridLines = [0, 0.5, 1].map((f) => {
     const y = padT + plotH * (1 - f);
     return `<line x1="${padL}" x2="${width - padR}" y1="${y}" y2="${y}" class="grid-line" />
-            <text x="${padL - 8}" y="${y + 4}" text-anchor="end" class="axis-tick">${esc(fmt.format(Math.round(max * f)))}</text>`;
+            <text x="${padL - 10}" y="${y + 4}" text-anchor="end" class="axis-tick">${esc(fmt.format(Math.round(max * f)))}</text>`;
   }).join('');
 
   const pathOf = (key) => series.map((s, i) => `${i === 0 ? 'M' : 'L'}${xAt(i)},${yAt(s[key])}`).join(' ');
 
+  // Alan gradyanı yolu
+  const areaPathOf = (key) => {
+    if (series.length === 0) return '';
+    const line = pathOf(key);
+    const lastX = xAt(series.length - 1);
+    const firstX = xAt(0);
+    const bottomY = padT + plotH;
+    return `${line} L${lastX},${bottomY} L${firstX},${bottomY} Z`;
+  };
+
   const dots = (key, hue) => series.map((s, i) => `
-    <circle class="line-dot" data-i="${i}" cx="${xAt(i)}" cy="${yAt(s[key])}" r="4"
-            fill="var(--series-${hue})" stroke="var(--chart-surface)" stroke-width="2" />`).join('');
+    <circle class="line-dot" data-i="${i}" cx="${xAt(i)}" cy="${yAt(s[key])}" r="5"
+            fill="var(--series-${hue})" stroke="var(--chart-surface)" stroke-width="2.5" />`).join('');
 
   const xLabels = series.map((s, i) => `
     <text x="${xAt(i)}" y="${height - 6}" text-anchor="middle" class="axis-tick">${esc(monthLabelFn(s.period))}</text>`).join('');
@@ -170,7 +174,19 @@ export function trendLineChart(series, monthLabelFn) {
 
   const svg = `
     <svg viewBox="0 0 ${width} ${height}" class="viz-root" role="group" aria-label="Aylık gelir gider trendi">
+      <defs>
+        <linearGradient id="incomeGradient" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="var(--series-blue)" stop-opacity="0.25" />
+          <stop offset="100%" stop-color="var(--series-blue)" stop-opacity="0.0" />
+        </linearGradient>
+        <linearGradient id="expenseGradient" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="var(--series-orange)" stop-opacity="0.2" />
+          <stop offset="100%" stop-color="var(--series-orange)" stop-opacity="0.0" />
+        </linearGradient>
+      </defs>
       ${gridLines}
+      <path d="${areaPathOf('income')}" fill="url(#incomeGradient)" />
+      <path d="${areaPathOf('expense')}" fill="url(#expenseGradient)" />
       <path d="${pathOf('income')}" class="line-path" stroke="var(--series-blue)" fill="none" />
       <path d="${pathOf('expense')}" class="line-path" stroke="var(--series-orange)" fill="none" />
       ${dots('income', 'blue')}

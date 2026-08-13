@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="description" content="Aylık gelir gider takibi: kategori kırılımı, tekrarlayan işlemler, bütçe limitleri." />
-    <meta name="theme-color" content="#0a0b0f" />
+    <meta name="theme-color" content="#090a0f" />
 
     <!-- iOS ana ekrana ekleme -->
     <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -15,44 +15,91 @@
     <link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32.png" />
     <link rel="icon" type="image/png" sizes="16x16" href="/icons/favicon-16.png" />
 
-    <title>Bütçe Defteri</title>
+    <title>Bütçe Defteri — Kişisel Finans Yönetimi</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@600;700&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Outfit:wght@500;600;700;800&display=swap" rel="stylesheet" />
   </head>
   <body>
+    <!-- Arka plan ambient işık ve mesh gradyan katmanları -->
+    <div class="ambient-glow glow-1"></div>
+    <div class="ambient-glow glow-2"></div>
+
     <div id="app">
       <header class="page-head">
+        <div class="brand-badge">
+          <span class="sparkle-icon"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/></svg></span>
+          <span>Akıllı Finans Takibi</span>
+        </div>
         <h1>Bütçe <span>Defteri</span></h1>
 
         <div class="month-nav">
-          <button type="button" class="icon-btn" id="prev-month" aria-label="Önceki ay">‹</button>
+          <button type="button" class="icon-btn" id="prev-month" aria-label="Önceki ay">
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+          </button>
           <span id="month-label" class="month-label"></span>
-          <button type="button" class="icon-btn" id="next-month" aria-label="Sonraki ay">›</button>
+          <button type="button" class="icon-btn" id="next-month" aria-label="Sonraki ay">
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+          </button>
         </div>
 
         <div class="stat-row">
-          <div class="stat-tile">
-            <span class="stat-label">Gelir</span>
+          <div class="stat-tile income-tile">
+            <div class="stat-header">
+              <span class="stat-icon-wrapper">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>
+              </span>
+              <span class="stat-label">Gelir</span>
+            </div>
             <strong class="stat-value" id="stat-income">₺0</strong>
           </div>
-          <div class="stat-tile">
-            <span class="stat-label">Gider</span>
+
+          <div class="stat-tile expense-tile">
+            <div class="stat-header">
+              <span class="stat-icon-wrapper">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="22 17 13.5 8.5 8.5 13.5 2 7"/><polyline points="16 17 22 17 22 11"/></svg>
+              </span>
+              <span class="stat-label">Gider</span>
+            </div>
             <strong class="stat-value" id="stat-expense">₺0</strong>
           </div>
-          <div class="stat-tile" id="stat-net-tile">
-            <span class="stat-label">Net</span>
+
+          <div class="stat-tile net-tile" id="stat-net-tile">
+            <div class="stat-header">
+              <span class="stat-icon-wrapper">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3v4a1 1 0 0 1-1 1H5a2 2 0 0 1-2-2V7"/></svg>
+              </span>
+              <span class="stat-label">Net Bütçe</span>
+            </div>
             <strong class="stat-value" id="stat-net">₺0</strong>
+          </div>
+
+          <div class="stat-tile savings-tile" id="stat-savings-tile">
+            <div class="stat-header">
+              <span class="stat-icon-wrapper">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="19" x2="5" y1="5" y2="19"/><circle cx="6.5" cy="6.5" r="2.5"/><circle cx="17.5" cy="17.5" r="2.5"/></svg>
+              </span>
+              <span class="stat-label">Tasarruf Oranı</span>
+            </div>
+            <strong class="stat-value" id="stat-savings">%0</strong>
           </div>
         </div>
 
-        <p class="avg-line" id="avg-line"></p>
+        <div class="avg-banner">
+          <span class="avg-icon"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" x2="12" y1="8" y2="12"/><line x1="12" x2="12.01" y1="16" y2="16"/></svg></span>
+          <p class="avg-line" id="avg-line"></p>
+        </div>
       </header>
 
       <main class="dashboard" id="dashboard">
         <!-- İşlem ekle -->
-        <section class="card">
-          <div class="card-head"><h2>İşlem Ekle</h2></div>
+        <section class="card glass-card">
+          <div class="card-head">
+            <h2>
+              <span class="card-head-icon"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14"/><path d="M12 5v14"/></svg></span>
+              İşlem Ekle
+            </h2>
+          </div>
           <form id="tx-form" class="tx-form">
             <div class="segmented" role="radiogroup" aria-label="İşlem türü">
               <button type="button" class="seg-btn is-active" data-type="expense" role="radio" aria-checked="true">Gider</button>
@@ -63,7 +110,7 @@
             <div class="field-row">
               <label class="field">
                 <span>Tutar (₺)</span>
-                <input type="number" name="amount" inputmode="decimal" step="0.01" min="0.01" required />
+                <input type="number" name="amount" inputmode="decimal" step="0.01" min="0.01" placeholder="0.00" required />
               </label>
               <label class="field">
                 <span>Tarih</span>
@@ -78,26 +125,50 @@
 
             <label class="field">
               <span>Not (opsiyonel)</span>
-              <input type="text" name="note" maxlength="120" placeholder="ör. hafta sonu market" />
+              <input type="text" name="note" maxlength="120" placeholder="ör. Hafta sonu market alışverişi" />
             </label>
 
-            <button type="submit" class="btn btn-primary btn-block">Ekle</button>
+            <button type="submit" class="btn btn-primary btn-block">
+              <span>İşlemi Kaydet</span>
+              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
+            </button>
           </form>
         </section>
 
         <!-- İşlem listesi -->
-        <section class="card" id="tx-list-card">
+        <section class="card glass-card" id="tx-list-card">
           <div class="card-head">
-            <h2>Bu Ayın İşlemleri</h2>
+            <h2>
+              <span class="card-head-icon"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" x2="21" y1="6" y2="6"/><line x1="8" x2="21" y1="12" y2="12"/><line x1="8" x2="21" y1="18" y2="18"/><line x1="3" x2="3.01" y1="6" y2="6"/><line x1="3" x2="3.01" y1="12" y2="12"/><line x1="3" x2="3.01" y1="18" y2="18"/></svg></span>
+              Bu Ayın İşlemleri
+            </h2>
             <span class="badge" id="tx-count-badge">0 işlem</span>
           </div>
+
+          <div class="list-toolbar">
+            <div class="search-box">
+              <span class="search-icon">
+                <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+              </span>
+              <input type="search" id="tx-search-input" placeholder="İşlemlerde ara (not veya kategori)..." autocomplete="off" />
+            </div>
+            <div class="segmented segmented-xs" id="tx-filter-group" role="radiogroup" aria-label="İşlem listesi filtresi">
+              <button type="button" class="seg-btn is-active" data-filter="all" role="radio" aria-checked="true">Tümü</button>
+              <button type="button" class="seg-btn" data-filter="expense" role="radio" aria-checked="false">Gider</button>
+              <button type="button" class="seg-btn" data-filter="income" role="radio" aria-checked="false">Gelir</button>
+            </div>
+          </div>
+
           <ul class="tx-list" id="tx-list"></ul>
         </section>
 
         <!-- Kategori dağılımı -->
-        <section class="card wide">
+        <section class="card glass-card wide">
           <div class="card-head">
-            <h2>Kategori Dağılımı</h2>
+            <h2>
+              <span class="card-head-icon"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.21 15.89A10 10 0 1 1 8 2.83"/><path d="M22 12A10 10 0 0 0 12 2v10z"/></svg></span>
+              Kategori Dağılımı
+            </h2>
             <div class="segmented segmented-sm" role="radiogroup" aria-label="Grafik türü">
               <button type="button" class="seg-btn is-active" data-chart-type="expense" role="radio" aria-checked="true">Gider</button>
               <button type="button" class="seg-btn" data-chart-type="income" role="radio" aria-checked="false">Gelir</button>
@@ -107,9 +178,12 @@
         </section>
 
         <!-- Trend -->
-        <section class="card wide">
+        <section class="card glass-card wide">
           <div class="card-head">
-            <h2>Aylık Trend</h2>
+            <h2>
+              <span class="card-head-icon"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/></svg></span>
+              Aylık Trend
+            </h2>
             <div class="legend">
               <span class="legend-item"><i style="background:var(--series-blue)"></i>Gelir</span>
               <span class="legend-item"><i style="background:var(--series-orange)"></i>Gider</span>
@@ -119,22 +193,32 @@
         </section>
 
         <!-- Bütçe limitleri -->
-        <section class="card wide">
-          <div class="card-head"><h2>Bütçe Limitleri</h2></div>
+        <section class="card glass-card wide">
+          <div class="card-head">
+            <h2>
+              <span class="card-head-icon"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg></span>
+              Bütçe Limitleri
+            </h2>
+          </div>
           <p class="card-desc">Kategoriye aylık limit koy; %70'te uyarı, %90'da ciddi, %100'de kritik renk alır.</p>
           <ul class="budget-list" id="budget-list"></ul>
           <form id="budget-form" class="budget-form">
             <select name="categoryId" id="budget-category" required></select>
             <div class="field-row">
               <input type="number" name="limit" inputmode="decimal" step="1" min="1" placeholder="Limit (₺)" required />
-              <button type="submit" class="btn">Kaydet</button>
+              <button type="submit" class="btn btn-secondary">Limit Kaydet</button>
             </div>
           </form>
         </section>
 
         <!-- Tekrarlayan işlemler -->
-        <section class="card wide">
-          <div class="card-head"><h2>Tekrarlayan İşlemler</h2></div>
+        <section class="card glass-card wide">
+          <div class="card-head">
+            <h2>
+              <span class="card-head-icon"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m17 2 4 4-4 4"/><path d="M3 11v-1a4 4 0 0 1 4-4h14"/><path d="m7 22-4-4 4-4"/><path d="M21 13v1a4 4 0 0 1-4 4H3"/></svg></span>
+              Tekrarlayan İşlemler
+            </h2>
+          </div>
           <p class="card-desc">Kira, maaş, abonelik gibi her ay tekrar eden işlemler — tanımladığında ilgili aya otomatik işlenir.</p>
           <ul class="recurring-list" id="recurring-list"></ul>
           <form id="recurring-form" class="tx-form">
@@ -145,12 +229,12 @@
             <input type="hidden" name="type" id="rec-type" value="expense" />
             <label class="field">
               <span>Ad</span>
-              <input type="text" name="name" maxlength="60" placeholder="ör. Kira" required />
+              <input type="text" name="name" maxlength="60" placeholder="ör. Ev Kirası" required />
             </label>
             <div class="field-row">
               <label class="field">
                 <span>Tutar (₺)</span>
-                <input type="number" name="amount" inputmode="decimal" step="0.01" min="0.01" required />
+                <input type="number" name="amount" inputmode="decimal" step="0.01" min="0.01" placeholder="0.00" required />
               </label>
               <label class="field">
                 <span>Ayın günü</span>
@@ -161,33 +245,139 @@
               <span>Kategori</span>
               <select name="categoryId" id="rec-category" required></select>
             </label>
-            <button type="submit" class="btn btn-block">Tekrarlayan İşlem Ekle</button>
+            <button type="submit" class="btn btn-secondary btn-block">Tekrarlayan İşlem Ekle</button>
           </form>
         </section>
       </main>
 
       <footer class="page-foot">
         <div class="data-actions">
-          <button type="button" class="btn btn-primary" id="export-btn">Yedek al (JSON)</button>
-          <button type="button" class="btn" id="import-btn">Yedekten yükle</button>
+          <button type="button" class="btn btn-secondary" id="export-csv-btn">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M8 13h2"/><path d="M14 13h2"/><path d="M8 17h2"/><path d="M14 17h2"/></svg>
+            <span>Excel / CSV İndir</span>
+          </button>
+          <button type="button" class="btn btn-secondary" id="export-btn">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>
+            <span>Yedek Al (JSON)</span>
+          </button>
+          <button type="button" class="btn btn-secondary" id="import-btn">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" x2="12" y1="3" y2="15"/></svg>
+            <span>Yedekten Yükle</span>
+          </button>
           <input type="file" id="import-input" accept="application/json,.json" hidden />
-          <button type="button" class="btn btn-danger" id="reset-btn">Tümünü Sıfırla</button>
+          <button type="button" class="btn btn-danger" id="reset-btn">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+            <span>Tümünü Sıfırla</span>
+          </button>
         </div>
 
-        <div class="confirm" id="reset-confirm" hidden>
+        <div class="confirm glass-confirm" id="reset-confirm" hidden>
           <span>Tüm işlemler, tekrarlayanlar ve limitler silinecek. Emin misin?</span>
           <button type="button" class="btn btn-danger" data-action="reset-yes">Evet, sıfırla</button>
-          <button type="button" class="btn" data-action="reset-no">Vazgeç</button>
+          <button type="button" class="btn btn-secondary" data-action="reset-no">Vazgeç</button>
         </div>
 
         <p class="status" id="status-line" role="status"></p>
 
         <p class="disclaimer">
-          Veriler yalnızca bu cihazda / bu tarayıcıda saklanır. Düzenli olarak yedek al.
-          Bu araç kişisel takip amaçlıdır; muhasebe veya vergi beyanı yerine geçmez.
+          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+          Veriler yalnızca bu cihazda saklanır. Düzenli olarak yedek alınız. Bu araç kişisel takip amaçlıdır.
         </p>
       </footer>
     </div>
+
+    <!-- İşlem Düzenleme Modalı -->
+    <dialog id="edit-tx-dialog" class="glass-modal">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3>İşlemi Düzenle</h3>
+          <button type="button" class="icon-btn close-btn" id="close-edit-tx" aria-label="Kapat">
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+          </button>
+        </div>
+        <form id="edit-tx-form" class="tx-form">
+          <input type="hidden" name="id" id="edit-tx-id" />
+          <div class="segmented" role="radiogroup" aria-label="İşlem türü">
+            <button type="button" class="seg-btn" data-type="expense" role="radio">Gider</button>
+            <button type="button" class="seg-btn" data-type="income" role="radio">Gelir</button>
+          </div>
+          <input type="hidden" name="type" id="edit-tx-type" />
+
+          <div class="field-row">
+            <label class="field">
+              <span>Tutar (₺)</span>
+              <input type="number" name="amount" id="edit-tx-amount" inputmode="decimal" step="0.01" min="0.01" placeholder="0.00" required />
+            </label>
+            <label class="field">
+              <span>Tarih</span>
+              <input type="date" name="date" id="edit-tx-date" required />
+            </label>
+          </div>
+
+          <label class="field">
+            <span>Kategori</span>
+            <select name="categoryId" id="edit-tx-category" required></select>
+          </label>
+
+          <label class="field">
+            <span>Not (opsiyonel)</span>
+            <input type="text" name="note" id="edit-tx-note" maxlength="120" placeholder="ör. Market harcaması" />
+          </label>
+
+          <div class="modal-actions">
+            <button type="button" class="btn btn-secondary" id="cancel-edit-tx">İptal</button>
+            <button type="submit" class="btn btn-primary">Kaydet</button>
+          </div>
+        </form>
+      </div>
+    </dialog>
+
+    <!-- Tekrarlayan İşlem Düzenleme Modalı -->
+    <dialog id="edit-rec-dialog" class="glass-modal">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3>Tekrarlayan İşlemi Düzenle</h3>
+          <button type="button" class="icon-btn close-btn" id="close-edit-rec" aria-label="Kapat">
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+          </button>
+        </div>
+        <form id="edit-rec-form" class="tx-form">
+          <input type="hidden" name="id" id="edit-rec-id" />
+          <div class="segmented" role="radiogroup" aria-label="Tekrarlayan işlem türü">
+            <button type="button" class="seg-btn" data-type="expense" role="radio">Gider</button>
+            <button type="button" class="seg-btn" data-type="income" role="radio">Gelir</button>
+          </div>
+          <input type="hidden" name="type" id="edit-rec-type" />
+
+          <label class="field">
+            <span>Ad</span>
+            <input type="text" name="name" id="edit-rec-name" maxlength="60" placeholder="ör. Ev Kirası" required />
+          </label>
+
+          <div class="field-row">
+            <label class="field">
+              <span>Tutar (₺)</span>
+              <input type="number" name="amount" id="edit-rec-amount" inputmode="decimal" step="0.01" min="0.01" placeholder="0.00" required />
+            </label>
+            <label class="field">
+              <span>Ayın günü</span>
+              <input type="number" name="day" id="edit-rec-day" min="1" max="28" required />
+            </label>
+          </div>
+
+          <label class="field">
+            <span>Kategori</span>
+            <select name="categoryId" id="edit-rec-category" required></select>
+          </label>
+
+          <div class="modal-actions">
+            <button type="button" class="btn btn-secondary" id="cancel-edit-rec">İptal</button>
+            <button type="submit" class="btn btn-primary">Kaydet</button>
+          </div>
+        </form>
+      </div>
+    </dialog>
+
     <script type="module" src="/src/main.js"></script>
   </body>
 </html>

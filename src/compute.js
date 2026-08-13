@@ -80,3 +80,44 @@ export function trailingAverageExpense(state, currentPeriod, n = 3) {
   }
   return counted > 0 ? Math.round(sum / counted) : 0;
 }
+
+/** Gelirin ne kadarının tasarruf edildiğini (%) hesaplar. */
+export function savingsRate(totals) {
+  if (!totals || totals.income <= 0) return 0;
+  return Math.round(((totals.income - totals.expense) / totals.income) * 100);
+}
+
+/**
+ * Geçerli ay ile önceki ayın kategori harcamalarını karşılaştırır.
+ */
+export function categoryComparison(state, currentPeriod, type = 'expense') {
+  const prevPeriod = shiftPeriod(currentPeriod, -1);
+  const currentTxs = transactionsInMonth(state, currentPeriod).filter((t) => t.type === type);
+  const prevTxs = transactionsInMonth(state, prevPeriod).filter((t) => t.type === type);
+
+  const currentSums = new Map();
+  for (const t of currentTxs) currentSums.set(t.categoryId, (currentSums.get(t.categoryId) || 0) + t.amount);
+
+  const prevSums = new Map();
+  for (const t of prevTxs) prevSums.set(t.categoryId, (prevSums.get(t.categoryId) || 0) + t.amount);
+
+  const allCatIds = new Set([...currentSums.keys(), ...prevSums.keys()]);
+  const rows = [];
+
+  for (const categoryId of allCatIds) {
+    const cur = currentSums.get(categoryId) || 0;
+    const prev = prevSums.get(categoryId) || 0;
+    const diff = cur - prev;
+    const diffPercent = prev > 0 ? Math.round((diff / prev) * 100) : cur > 0 ? 100 : 0;
+    rows.push({
+      categoryId,
+      category: categoryById(categoryId) || { id: categoryId, name: 'Diğer', icon: '🔹' },
+      currentAmount: cur,
+      prevAmount: prev,
+      diff,
+      diffPercent,
+    });
+  }
+
+  return rows.sort((a, b) => b.currentAmount - a.currentAmount);
+}
