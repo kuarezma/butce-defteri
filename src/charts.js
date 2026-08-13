@@ -50,9 +50,15 @@ function showTooltip(x, y, rows) {
     line.append(val, label);
     el.appendChild(line);
   }
-  el.style.left = `${x}px`;
-  el.style.top = `${y}px`;
   el.hidden = false;
+  const w = el.offsetWidth || 160;
+  const h = el.offsetHeight || 40;
+  const maxX = (window.innerWidth || 360) - w - 16;
+  const maxY = (window.innerHeight || 640) - h - 16;
+  const clampedX = Math.max(12, Math.min(x, maxX));
+  const clampedY = Math.max(12, Math.min(y, maxY));
+  el.style.left = `${clampedX}px`;
+  el.style.top = `${clampedY}px`;
 }
 
 function hideTooltip() {

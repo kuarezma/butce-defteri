@@ -281,11 +281,29 @@ function persist() {
   }
 }
 
+function localTodayIso() {
+  const now = new Date();
+  const y = now.getFullYear();
+  const m = String(now.getMonth() + 1).padStart(2, '0');
+  const d = String(now.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
 function getDefaultDateForPeriod(period) {
-  const todayIso = new Date().toISOString().slice(0, 10);
+  const todayIso = localTodayIso();
   if (todayIso.startsWith(period)) return todayIso;
   return `${period}-01`;
 }
+
+// ---------- Modal Dialog Backdrop Tıklaması ile Kapatma ----------
+
+document.querySelectorAll('dialog').forEach((dialog) => {
+  dialog.addEventListener('click', (event) => {
+    if (event.target === dialog) {
+      dialog.close();
+    }
+  });
+});
 
 // ---------- PIN Kilit Kontrolü ----------
 
@@ -1342,7 +1360,7 @@ if (els.exportCsvBtn) {
       status('Dışa aktarılacak işlem bulunmuyor.', 'error');
       return;
     }
-    const stamp = new Date().toISOString().slice(0, 10);
+    const stamp = localTodayIso();
     const csvData = transactionsToCsv(state.transactions, state.customCategories);
     downloadCsv(csvData, `butce-islemleri-${stamp}.csv`);
     status('İşlemler Excel/CSV olarak indirildi.');
@@ -1380,7 +1398,7 @@ if (els.importCsvInput) {
 // ---------- Yedek al / yükle / sıfırla ----------
 
 els.exportBtn.addEventListener('click', () => {
-  const stamp = new Date().toISOString().slice(0, 10);
+  const stamp = localTodayIso();
   const blob = new Blob([serialize(state)], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');

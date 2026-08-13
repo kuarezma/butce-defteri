@@ -12,8 +12,20 @@ export function isPrivacyMode() {
   return privacyMode;
 }
 
-const fmt = new Intl.NumberFormat('tr-TR', { maximumFractionDigits: 0 });
-export const money = (n) => (privacyMode ? '₺••••' : `₺${fmt.format(n)}`);
+const fmtWhole = new Intl.NumberFormat('tr-TR', { maximumFractionDigits: 0 });
+const fmtDec = new Intl.NumberFormat('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+export const money = (n) => {
+  if (privacyMode) return '₺••••';
+  const num = Number(n) || 0;
+  return num % 1 === 0 ? `₺${fmtWhole.format(num)}` : `₺${fmtDec.format(num)}`;
+};
+
+export function trLower(str) {
+  return String(str || '')
+    .toLocaleLowerCase('tr-TR')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '');
+}
 
 const monthNames = ['Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran', 'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'];
 const monthShort = ['Oca', 'Şub', 'Mar', 'Nis', 'May', 'Haz', 'Tem', 'Ağu', 'Eyl', 'Eki', 'Kas', 'Ara'];
@@ -76,7 +88,8 @@ export function renderStats(elements, totals, avgExpense, savingsPct) {
 
 export function renderTransactionList(container, badge, transactions, options = {}) {
   const { search = '', filter = 'all', customCategories = [] } = options;
-  const q = search.trim().toLowerCase();
+  const q = search.trim();
+  const qNorm = trLower(q);
 
   let filtered = [...transactions];
   if (filter !== 'all') {
@@ -85,9 +98,13 @@ export function renderTransactionList(container, badge, transactions, options = 
   if (q) {
     filtered = filtered.filter((t) => {
       const cat = categoryById(t.categoryId, customCategories);
-      const catName = (cat ? cat.name : '').toLowerCase();
-      const note = (t.note || '').toLowerCase();
-      return catName.includes(q) || note.includes(q);
+      const catName = cat ? cat.name : '';
+      const note = t.note || '';
+      return (
+        trLower(catName).includes(qNorm) ||
+        trLower(note).includes(qNorm) ||
+        t.date.includes(q)
+      );
     });
   }
 

@@ -199,4 +199,48 @@ describe('compute.js unit tests', () => {
     expect(txs[1].amount).toBe(45000);
     expect(txs[1].type).toBe('income');
   });
+
+  it('handles uppercase and Turkish characters in quick entry', () => {
+    const p1 = parseQuickEntry('MARKET 450');
+    expect(p1.amount).toBe(450);
+    expect(p1.categoryId).toBe('gider-market');
+
+    const p2 = parseQuickEntry('MAAŞ 75000');
+    expect(p2.amount).toBe(75000);
+    expect(p2.categoryId).toBe('gelir-maas');
+    expect(p2.type).toBe('income');
+  });
+
+  it('installmentStats correctly handles fully paid and future installment edge cases', () => {
+    const s = normalize({});
+    // Past completed installment
+    addInstallment(s, {
+      name: 'Koltuk',
+      totalAmount: 12000,
+      totalInstallments: 3,
+      startPeriod: '2026-01',
+      categoryId: 'gider-diger',
+    });
+
+    // Future installment
+    addInstallment(s, {
+      name: 'Buzdolabı',
+      totalAmount: 30000,
+      totalInstallments: 6,
+      startPeriod: '2026-10',
+      categoryId: 'gider-diger',
+    });
+
+    const stats = installmentStats(s, '2026-08');
+    const past = stats.list.find((x) => x.name === 'Koltuk');
+    const future = stats.list.find((x) => x.name === 'Buzdolabı');
+
+    expect(past.remainingCount).toBe(0);
+    expect(past.remainingDebt).toBe(0);
+    expect(past.isActiveThisMonth).toBe(false);
+
+    expect(future.remainingCount).toBe(6);
+    expect(future.remainingDebt).toBe(30000);
+    expect(future.isActiveThisMonth).toBe(false);
+  });
 });
