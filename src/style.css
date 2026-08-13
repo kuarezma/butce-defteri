@@ -2043,11 +2043,195 @@ dialog.wide-modal {
   font-weight: 600;
 }
 
-.palette-empty {
-  padding: 24px;
-  text-align: center;
-  color: var(--text-muted);
+/* ---------- Ana Sekme Navigasyonu (Tabs) ---------- */
+
+.main-tabs {
+  display: flex;
+  align-items: center;
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-pill);
+  padding: 4px;
+  gap: 4px;
+  backdrop-filter: blur(16px);
+  box-shadow: var(--shadow-sm);
+  overflow-x: auto;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+  width: 100%;
+  margin-top: 6px;
+}
+
+.main-tabs::-webkit-scrollbar {
+  display: none;
+}
+
+.tab-btn {
+  flex: 1;
+  min-width: max-content;
+  border: none;
+  background: transparent;
+  padding: 9px 14px;
+  border-radius: var(--radius-pill);
+  font: inherit;
   font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  transition: all 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+  white-space: nowrap;
+}
+
+.tab-btn .tab-icon {
+  font-size: 1rem;
+}
+
+.tab-btn.is-active {
+  background: var(--accent-primary);
+  color: #ffffff;
+  box-shadow: 0 4px 14px var(--accent-glow);
+}
+
+.tab-btn:hover:not(.is-active) {
+  color: var(--text-primary);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.tab-btn:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 2px;
+}
+
+.tab-pane {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  animation: tabFadeIn 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.tab-pane[hidden] {
+  display: none !important;
+}
+
+@keyframes tabFadeIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* ---------- Finans Araçları Grid (Tools Grid) ---------- */
+
+.tools-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+  margin-top: 6px;
+}
+
+.tool-tile {
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  text-align: left;
+  color: var(--text-primary);
+  font: inherit;
+  backdrop-filter: blur(8px);
+}
+
+.tool-tile:hover {
+  background: var(--surface-hover);
+  border-color: var(--accent-primary);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(99, 102, 241, 0.15);
+}
+
+.tool-tile:active {
+  transform: scale(0.98);
+}
+
+.tool-tile-icon {
+  font-size: 1.5rem;
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: rgba(99, 102, 241, 0.12);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.tool-tile-title {
+  display: block;
+  font-family: 'Outfit', sans-serif;
+  font-weight: 700;
+  font-size: 0.95rem;
+  margin-bottom: 2px;
+}
+
+.tool-tile-desc {
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+  line-height: 1.35;
+}
+
+/* ---------- Veri & Yedekleme Grid ---------- */
+
+.data-actions-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+  margin-top: 14px;
+}
+
+@media (max-width: 500px) {
+  .data-actions-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.danger-zone {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+
+.confirm-btns {
+  display: flex;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.disclaimer-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 16px 18px;
+  border-radius: var(--radius);
+  background: rgba(16, 185, 129, 0.06);
+  border: 1px solid rgba(16, 185, 129, 0.2);
+  color: var(--text-secondary);
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+
+.disclaimer-card svg {
+  color: #10b981;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.disclaimer-card strong {
+  color: var(--text-primary);
 }
 
 /* ---------- iPhone & Android Mobil Uyumluluk & Safe Area ---------- */

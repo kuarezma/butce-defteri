@@ -145,6 +145,13 @@ Bu araç kişisel takip amaçlıdır; muhasebe veya vergi beyanı yerine geçmez
 
 ## 📝 Değişiklik Günlüğü (Changelog)
 
+### v0.6.0 (2026-08-14)
+- 🗂️ **Modern Sekmeli Arayüz Mimarisi (Tab Navigation):** Monolitik ve uzun sayfa akışı 4 net, odaklı ve modern sekmeye bölündü (`📊 İşlemler`, `📈 Analiz & Grafikler`, `🎯 Planlama & Birikim`, `⚙️ Araçlar & Ayarlar`).
+- 💎 **Sadeleştirilmiş Üst Çubuk (Uncluttered Header):** 10 adet sıkışık buton yerine en kritik eylemler (Komut Paleti, Gizlilik, Tema, Paylaşım, Yazdır) üstte tutuldu; özel araçlar sekme içine şık kartlar olarak taşındı.
+- ⚡ **Komut Paleti ile Sekme Geçişi:** `Cmd + K` paletine doğrudan sekmeler arası gezinme ve hızlı form odaklanması entegre edildi.
+- 📅 **Isı Haritasından İşlemlere Akıllı Geçiş:** Harcama ısı haritasında bir güne tıklandığında filtrelenen işlemler sekmesine anında ve pürüzsüz geçiş sağlandı.
+- 🧪 **Vitest & Build Doğrulaması:** 24 birim testi ve üretim derlemesi %100 sıfır hatayla doğrulandı.
+
 ### v0.5.0 (2026-08-14)
 - 💳 **Taksitli Harcama & Borç Takipçisi:** Taksitli alışverişleri (telefon, beyaz eşya, vb.) tanımlama, aylara otomatik paylaştırma ve kalan borç ilerleme çubuğu.
 - 🎮 **Bütçe Simülatörü ("Ne Olursa?" Senaryoları):** Harcama kısma ve ek gelir kaydırıcıları ile anlık tasarruf ve yıllık ek birikim projeksiyonu.

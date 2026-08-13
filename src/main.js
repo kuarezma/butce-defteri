@@ -310,6 +310,29 @@ if (els.pinUnlockForm) {
   });
 }
 
+// ---------- Ana Sekme (Tabs) Yönetimi ----------
+
+const tabBtns = document.querySelectorAll('.tab-btn');
+const tabPanes = document.querySelectorAll('.tab-pane');
+
+export function switchTab(tabId) {
+  tabBtns.forEach((btn) => {
+    const active = btn.dataset.tab === tabId;
+    btn.classList.toggle('is-active', active);
+    btn.setAttribute('aria-selected', String(active));
+  });
+
+  tabPanes.forEach((pane) => {
+    pane.hidden = pane.id !== tabId;
+  });
+}
+
+tabBtns.forEach((btn) => {
+  btn.addEventListener('click', () => {
+    switchTab(btn.dataset.tab);
+  });
+});
+
 // ---------- Segmented kontrol yardımcı ----------
 
 function wireSegmented(root, hiddenInput, onChange) {
@@ -492,6 +515,7 @@ if (els.heatmapHost) {
       filter: txTypeFilter,
       customCategories: state.customCategories,
     });
+    switchTab('tab-overview');
     els.txList.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   });
 }
@@ -672,7 +696,11 @@ let paletteSelectedIndex = 0;
 
 function getAvailableCommands() {
   return [
-    { title: 'Detaylı İşlem Ekle', sub: 'İşlem formuna odaklan', icon: '➕', action: () => els.txAmountInput.focus() },
+    { title: 'İşlemler Sekmesine Git', sub: 'Hızlı giriş ve bu ayın işlemleri', icon: '📊', action: () => switchTab('tab-overview') },
+    { title: 'Analiz & Grafikler Sekmesine Git', sub: 'Kategori, trend ve 50/30/20 analizi', icon: '📈', action: () => switchTab('tab-analytics') },
+    { title: 'Planlama & Birikim Sekmesine Git', sub: 'Taksitler, hedefler ve tekrarlayanlar', icon: '🎯', action: () => switchTab('tab-planning') },
+    { title: 'Araçlar & Ayarlar Sekmesine Git', sub: 'Simülatör, raporlar ve yedekleme', icon: '⚙️', action: () => switchTab('tab-tools') },
+    { title: 'Detaylı İşlem Ekle', sub: 'İşlem formuna odaklan', icon: '➕', action: () => { switchTab('tab-overview'); els.txAmountInput.focus(); } },
     { title: 'Taksitli Harcama Ekle', sub: 'Yeni taksitli borç planı oluştur', icon: '💳', action: () => els.addInstallmentBtn.click() },
     { title: 'Yeni Birikim Hedefi Ekle', sub: 'Kumbara hedefi oluştur', icon: '🎯', action: () => els.addGoalBtn.click() },
     { title: 'Bütçe Simülatörü', sub: 'Ne Olursa? projeksiyonu', icon: '🎮', action: () => els.simulatorBtn.click() },
@@ -680,11 +708,14 @@ function getAvailableCommands() {
     { title: 'Gizlilik Modunu Aç/Kapat', sub: 'Tutarları gizle veya göster', icon: '👁️', action: () => els.privacyToggleBtn.click() },
     { title: 'Koyu / Açık Tema Değiştir', sub: 'Arayüz rengini ayarla', icon: '🌓', action: () => els.themeToggleBtn.click() },
     { title: 'Döviz & Kur Ayarları', sub: 'USD, EUR, GBP kurlarını yönet', icon: '💱', action: () => els.currencyBtn.click() },
+    { title: 'Özel Kategori Yönetimi', sub: 'Yeni kategoriler ekle/sil', icon: '🏷️', action: () => els.customCatBtn.click() },
+    { title: 'PIN Kilidi Ayarları', sub: '4 haneli güvenlik kilidi', icon: '🔒', action: () => els.pinToggleBtn.click() },
     { title: 'PDF / Yazdır', sub: 'Raporu yazdır veya kaydet', icon: '📄', action: () => els.printBtn.click() },
     { title: 'Bu Aya Git', sub: 'Geçerli takvim ayına dön', icon: '📅', action: () => { currentPeriod = periodKey(); paint(); } },
     { title: 'Önceki Aya Git', sub: 'Geçmiş ayı incele', icon: '◀️', action: () => els.prevMonth.click() },
     { title: 'Sonraki Aya Git', sub: 'Gelecek ayı incele', icon: '▶️', action: () => els.nextMonth.click() },
     { title: 'Excel / CSV İndir', sub: 'İşlemleri dışa aktar', icon: '📥', action: () => els.exportCsvBtn.click() },
+    { title: 'JSON Yedek İndir', sub: 'Tüm verileri yedekle', icon: '💾', action: () => els.exportBtn.click() },
   ];
 }
 
