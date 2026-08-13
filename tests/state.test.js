@@ -3,6 +3,8 @@ import {
   normalize, SCHEMA,
   addTransaction, removeTransaction, updateTransaction, transactionsInMonth,
   addRecurring, removeRecurring, updateRecurring, setRecurringActive, materializeRecurring,
+  addInstallment, removeInstallment, updateInstallment, materializeInstallments,
+  setCurrencyRate, convertToTRY,
   setBudget, addCustomCategory, removeCustomCategory, updateCustomCategory,
   addGoal, removeGoal, updateGoal, contributeToGoal,
   setPin, verifyPin, removePin, hasPin,
@@ -21,6 +23,7 @@ describe('state.js unit tests', () => {
     expect(s.recurring).toEqual([]);
     expect(s.customCategories).toEqual([]);
     expect(s.goals).toEqual([]);
+    expect(s.installments).toEqual([]);
     expect(s.budgets).toEqual({});
   });
 
@@ -91,6 +94,38 @@ describe('state.js unit tests', () => {
     // Update recurring
     updateRecurring(s, rec.id, { amount: 18000 });
     expect(s.recurring[0].amount).toBe(18000);
+  });
+
+  it('addInstallment and materializeInstallments calculate monthly share and materialize', () => {
+    const s = normalize({});
+    const ins = addInstallment(s, {
+      name: 'iPhone 16',
+      totalAmount: 60000,
+      totalInstallments: 6,
+      startPeriod: '2026-08',
+      categoryId: 'gider-diger',
+    });
+
+    expect(ins).not.toBeNull();
+    expect(ins.monthlyAmount).toBe(10000);
+    expect(s.installments.length).toBe(1);
+
+    // Materialize for Aug 2026 (Month 1/6)
+    const count = materializeInstallments(s, '2026-08');
+    expect(count).toBe(1);
+    expect(s.transactions.length).toBe(1);
+    expect(s.transactions[0].amount).toBe(10000);
+    expect(s.transactions[0].note).toContain('Taksit 1/6');
+
+    // Second call is idempotent
+    expect(materializeInstallments(s, '2026-08')).toBe(0);
+  });
+
+  it('setCurrencyRate and convertToTRY work properly', () => {
+    const s = normalize({});
+    setCurrencyRate(s, 'USD', 35.0);
+    expect(convertToTRY(100, 'USD', s)).toBe(3500);
+    expect(convertToTRY(500, 'TRY', s)).toBe(500);
   });
 
   it('shiftPeriod correctly shifts dates across month/year borders', () => {

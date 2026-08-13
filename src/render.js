@@ -110,11 +110,16 @@ export function renderTransactionList(container, badge, transactions, options = 
   container.innerHTML = sorted.map((t) => {
     const cat = categoryById(t.categoryId, customCategories) || { icon: '❔', name: 'Bilinmeyen' };
     const sign = t.type === 'income' ? '+' : '−';
+    const hasCurrency = t.currency && t.currency !== 'TRY' && t.originalAmount;
+    const currencyTag = hasCurrency ? `<span class="tx-curr-tag">${t.currency === 'USD' ? '$' : t.currency === 'EUR' ? '€' : t.currency === 'GBP' ? '£' : ''}${t.originalAmount} ${t.currency}</span>` : '';
+    const receiptBtn = t.receiptImage ? `<button type="button" class="tx-receipt-badge" data-preview-receipt="${esc(t.id)}" title="Fiş Fotoğrafını Gör">${getIcon('camera')} Fiş</button>` : '';
+    const instTag = t.installmentId ? `<span class="tx-inst-badge">Taksit</span>` : '';
+
     return `
       <li class="tx-row" data-id="${esc(t.id)}">
         <span class="tx-icon" aria-hidden="true">${esc(cat.icon)}</span>
         <div class="tx-main">
-          <div class="tx-title">${esc(cat.name)}</div>
+          <div class="tx-title">${esc(cat.name)} ${currencyTag} ${instTag} ${receiptBtn}</div>
           <div class="tx-sub">${esc(fmtDate(t.date))}${t.note ? ` · ${esc(t.note)}` : ''}${t.recurringId ? ' · tekrarlayan' : ''}</div>
         </div>
         <span class="tx-amount" data-type="${t.type}">${sign}${esc(money(t.amount))}</span>
@@ -436,6 +441,96 @@ export function renderAnnualReport(host, summary) {
       </div>
     </div>
   `;
+}
+
+// ---------- Taksit Listesi Render ----------
+
+export function renderInstallmentList(container, statsData) {
+  if (!container) return;
+  if (!statsData || statsData.list.length === 0) {
+    container.innerHTML = '<li class="empty-row">Kayıtlı taksitli harcama veya borç bulunmuyor.</li>';
+    return;
+  }
+
+  container.innerHTML = statsData.list.map((ins) => `
+    <li class="installment-card ${ins.remainingCount === 0 ? 'is-paid-off' : ''}" data-id="${esc(ins.id)}">
+      <div class="inst-header">
+        <span class="inst-icon">${esc(ins.category.icon)}</span>
+        <div class="inst-info">
+          <h4>${esc(ins.name)}</h4>
+          <span class="inst-sub">Aylık: <strong>${money(ins.monthlyAmount)}</strong> · Kalan: ${ins.remainingCount} / ${ins.totalInstallments} ay</span>
+        </div>
+        <div class="inst-figures">
+          <strong>${money(ins.remainingDebt)}</strong>
+          <span>kalan borç</span>
+        </div>
+      </div>
+      <div class="inst-progress" role="progressbar" aria-valuenow="${ins.progressPct}" aria-valuemin="0" aria-valuemax="100">
+        <div class="inst-progress-fill" style="width: ${ins.progressPct}%"></div>
+      </div>
+      <div class="inst-footer">
+        <span class="inst-tag ${ins.isActiveThisMonth ? 'is-active' : ''}">
+          ${ins.isActiveThisMonth ? 'Bu ay taksiti aktif' : ins.remainingCount === 0 ? 'Tamamı Ödendi' : 'Beklemede'}
+        </span>
+        <button type="button" class="btn btn-xs btn-danger" data-delete-inst="${esc(ins.id)}">Sil</button>
+      </div>
+    </li>
+  `).join('');
+}
+
+// ---------- Bütçe Simülatörü Render ----------
+
+export function renderSimulator(container, sim, customCategories = []) {
+  if (!container) return;
+
+  container.innerHTML = `
+    <div class="simulator-card">
+      <div class="sim-stats-grid">
+        <div class="sim-stat-box">
+          <span class="stat-label">Mevcut Net</span>
+          <strong class="stat-value ${sim.currentNet >= 0 ? 'text-blue' : 'text-red'}">${money(sim.currentNet)}</strong>
+        </div>
+        <div class="sim-stat-box sim-highlight">
+          <span class="stat-label">Simüle Edilen Net</span>
+          <strong class="stat-value ${sim.newNet >= 0 ? 'text-green' : 'text-red'}">${money(sim.newNet)}</strong>
+        </div>
+        <div class="sim-stat-box">
+          <span class="stat-label">Aylık Ek Kazanç</span>
+          <strong class="stat-value text-aqua">+${money(sim.netImprovement)}</strong>
+        </div>
+        <div class="sim-stat-box">
+          <span class="stat-label">Yıllık Ek Tasarruf</span>
+          <strong class="stat-value text-green">+${money(sim.yearlyCutSavings + (sim.newIncome - sim.currentIncome) * 12)}</strong>
+        </div>
+      </div>
+
+      <div class="sim-feedback">
+        <span class="sim-badge">🎯 Tasarruf Oranı: %${sim.newSavingsRate}</span>
+        <p>Bu senaryo ile yılda <strong>${money(sim.yearlyCutSavings + (sim.newIncome - sim.currentIncome) * 12)}</strong> ek birikim yapabilirsin!</p>
+      </div>
+    </div>
+  `;
+}
+
+// ---------- Hızlı Komut Paleti Render ----------
+
+export function renderCommandPalette(container, items, selectedIndex = 0) {
+  if (!container) return;
+  if (items.length === 0) {
+    container.innerHTML = '<div class="palette-empty">Sonuç bulunamadı.</div>';
+    return;
+  }
+
+  container.innerHTML = items.map((item, idx) => `
+    <div class="palette-item ${idx === selectedIndex ? 'is-selected' : ''}" data-palette-index="${idx}">
+      <span class="palette-icon">${item.icon || '⚡'}</span>
+      <div class="palette-text">
+        <span class="palette-title">${esc(item.title)}</span>
+        ${item.sub ? `<span class="palette-sub">${esc(item.sub)}</span>` : ''}
+      </div>
+      ${item.badge ? `<span class="palette-badge">${esc(item.badge)}</span>` : ''}
+    </div>
+  `).join('');
 }
 
 export { CATEGORIES };

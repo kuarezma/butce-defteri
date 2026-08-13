@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { normalize, addTransaction, setBudget, addCustomCategory } from '../src/state.js';
+import { normalize, addTransaction, setBudget, addCustomCategory, addInstallment } from '../src/state.js';
 import {
   monthTotals,
   categoryBreakdown,
@@ -12,6 +12,8 @@ import {
   parseQuickEntry,
   annualSummary,
   dailyExpenseHeatmap,
+  installmentStats,
+  simulateScenario,
 } from '../src/compute.js';
 import { parseCsvToTransactions } from '../src/export.js';
 
@@ -104,7 +106,7 @@ describe('compute.js unit tests', () => {
     expect(ftt.savingsPct).toBe(15);
   });
 
-  it('parseQuickEntry accurately parses natural language text into transaction', () => {
+  it('parseQuickEntry accurately parses natural language and currency', () => {
     const p1 = parseQuickEntry('market 350');
     expect(p1.amount).toBe(350);
     expect(p1.categoryId).toBe('gider-market');
@@ -115,9 +117,11 @@ describe('compute.js unit tests', () => {
     expect(p2.categoryId).toBe('gelir-maas');
     expect(p2.type).toBe('income');
 
-    const p3 = parseQuickEntry('starbucks kahve 95 TL');
-    expect(p3.amount).toBe(95);
-    expect(p3.categoryId).toBe('gider-disarida');
+    const s = normalize({ currencies: { USD: 35.0 } });
+    const p3 = parseQuickEntry('$100 freelance iş', [], s);
+    expect(p3.originalAmount).toBe(100);
+    expect(p3.amount).toBe(3500);
+    expect(p3.currency).toBe('USD');
   });
 
   it('annualSummary calculates 12-month metrics and top categories', () => {
@@ -145,6 +149,42 @@ describe('compute.js unit tests', () => {
     const day15 = heatmap.days.find((d) => d.dayNum === 15);
     expect(day15.totalExpense).toBe(2000);
     expect(day15.intensity).toBe(4);
+  });
+
+  it('installmentStats calculates remaining debt and active installments', () => {
+    const s = normalize({});
+    addInstallment(s, {
+      name: 'TV',
+      totalAmount: 24000,
+      totalInstallments: 12,
+      startPeriod: '2026-06',
+      categoryId: 'gider-diger',
+    });
+
+    const stats = installmentStats(s, '2026-08');
+    expect(stats.list.length).toBe(1);
+    expect(stats.totalMonthly).toBe(2000);
+    expect(stats.list[0].currentInstallment).toBe(3);
+    expect(stats.list[0].remainingCount).toBe(10);
+    expect(stats.totalRemainingDebt).toBe(20000);
+  });
+
+  it('simulateScenario correctly simulates savings and net improvements', () => {
+    const s = normalize({});
+    addTransaction(s, { type: 'income', amount: 40000, categoryId: 'gelir-maas', date: '2026-08-01' });
+    addTransaction(s, { type: 'expense', amount: 10000, categoryId: 'gider-disarida', date: '2026-08-05' });
+
+    const sim = simulateScenario(s, '2026-08', {
+      cutCategoryId: 'gider-disarida',
+      cutPercent: 30,
+      incomeBoostPercent: 10,
+    });
+
+    expect(sim.monthlyCutSavings).toBe(3000);
+    expect(sim.yearlyCutSavings).toBe(36000);
+    expect(sim.newIncome).toBe(44000);
+    expect(sim.newExpense).toBe(7000);
+    expect(sim.newNet).toBe(37000);
   });
 
   it('parseCsvToTransactions parses CSV lines correctly', () => {

@@ -3,6 +3,7 @@ import {
   load, save, normalize, serialize,
   addTransaction, removeTransaction, updateTransaction, transactionsInMonth,
   addRecurring, removeRecurring, updateRecurring, setRecurringActive, materializeRecurring,
+  addInstallment, removeInstallment, materializeInstallments, setCurrencyRate, convertToTRY,
   setBudget, addCustomCategory, removeCustomCategory,
   addGoal, removeGoal, updateGoal, contributeToGoal,
   hasPin, setPin, verifyPin, removePin,
@@ -11,12 +12,14 @@ import {
 import {
   monthTotals, categoryBreakdown, trendSeries, budgetStatus, trailingAverageExpense, savingsRate,
   computeFiftyThirtyTwenty, parseQuickEntry, annualSummary, dailyExpenseHeatmap,
+  installmentStats, simulateScenario,
 } from './compute.js';
 import {
   fillCategorySelect, fillBudgetCategorySelect,
   renderStats, renderTransactionList, renderCategoryChart, renderTrendChart,
   renderBudgetList, renderRecurringList, renderFiftyThirtyTwenty, renderCustomCategoryList,
   renderGoalsList, renderCalendarHeatmap, renderAnnualReport,
+  renderInstallmentList, renderSimulator, renderCommandPalette,
   monthLabel, setPrivacyMode, isPrivacyMode,
 } from './render.js';
 import { transactionsToCsv, downloadCsv, parseCsvToTransactions } from './export.js';
@@ -28,9 +31,13 @@ let currentAnnualYear = parseInt(currentPeriod.slice(0, 4), 10);
 let categoryChartType = 'expense';
 let txSearchQuery = '';
 let txTypeFilter = 'all';
+let pendingReceiptData = null;
 
-// Ay açılınca o aya tanımlı tekrarlayanları işle (idempotent).
-if (materializeRecurring(state, currentPeriod) > 0) save(state);
+// Ay açılınca o aya tanımlı tekrarlayanları ve taksitleri işle (idempotent).
+let initialMaterialized = false;
+if (materializeRecurring(state, currentPeriod) > 0) initialMaterialized = true;
+if (materializeInstallments(state, currentPeriod) > 0) initialMaterialized = true;
+if (initialMaterialized) save(state);
 
 // ---------- Tema ve Gizlilik Modu Başlatma ----------
 
@@ -90,6 +97,11 @@ const els = {
   customCatBtn: document.getElementById('custom-cat-btn'),
   pinToggleBtn: document.getElementById('pin-toggle-btn'),
   annualReportBtn: document.getElementById('annual-report-btn'),
+  commandBtn: document.getElementById('command-btn'),
+  simulatorBtn: document.getElementById('simulator-btn'),
+  currencyBtn: document.getElementById('currency-btn'),
+  shareBtn: document.getElementById('share-btn'),
+  printBtn: document.getElementById('print-btn'),
 
   // Quick Entry
   quickEntryForm: document.getElementById('quick-entry-form'),
@@ -97,8 +109,11 @@ const els = {
 
   txForm: document.getElementById('tx-form'),
   txType: document.getElementById('tx-type'),
+  txCurrency: document.getElementById('tx-currency'),
   txCategory: document.getElementById('tx-category'),
   txAmountInput: document.getElementById('tx-amount-input'),
+  txReceiptInput: document.getElementById('tx-receipt-input'),
+  txReceiptStatus: document.getElementById('tx-receipt-status'),
   txList: document.getElementById('tx-list'),
   txCountBadge: document.getElementById('tx-count-badge'),
   txSearchInput: document.getElementById('tx-search-input'),
@@ -110,6 +125,9 @@ const els = {
   heatmapHost: document.getElementById('heatmap-host'),
   goalsList: document.getElementById('goals-list'),
   addGoalBtn: document.getElementById('add-goal-btn'),
+
+  installmentsList: document.getElementById('installments-list'),
+  addInstallmentBtn: document.getElementById('add-installment-btn'),
 
   budgetList: document.getElementById('budget-list'),
   budgetForm: document.getElementById('budget-form'),
@@ -173,6 +191,47 @@ const els = {
   depositGoalAmount: document.getElementById('deposit-goal-amount'),
   closeGoalDeposit: document.getElementById('close-goal-deposit'),
   cancelDepositBtn: document.getElementById('cancel-deposit-btn'),
+
+  // Installments Modal
+  installmentDialog: document.getElementById('installment-dialog'),
+  installmentForm: document.getElementById('installment-form'),
+  instTotalAmt: document.getElementById('inst-total-amt'),
+  instCount: document.getElementById('inst-count'),
+  instStartPeriod: document.getElementById('inst-start-period'),
+  instCategory: document.getElementById('inst-category'),
+  instMonthlyPreview: document.getElementById('inst-monthly-preview'),
+  closeInstDialog: document.getElementById('close-inst-dialog'),
+  cancelInstBtn: document.getElementById('cancel-inst-btn'),
+
+  // Simulator Modal
+  simulatorDialog: document.getElementById('simulator-dialog'),
+  simCategorySelect: document.getElementById('sim-category-select'),
+  simCutRange: document.getElementById('sim-cut-range'),
+  simCutVal: document.getElementById('sim-cut-val'),
+  simIncomeRange: document.getElementById('sim-income-range'),
+  simIncomeVal: document.getElementById('sim-income-val'),
+  simulatorResultsHost: document.getElementById('simulator-results-host'),
+  closeSimulator: document.getElementById('close-simulator'),
+
+  // Command Palette
+  commandDialog: document.getElementById('command-dialog'),
+  paletteSearch: document.getElementById('palette-search'),
+  paletteList: document.getElementById('palette-list'),
+
+  // Receipt Modal
+  receiptDialog: document.getElementById('receipt-dialog'),
+  receiptPreviewImg: document.getElementById('receipt-preview-img'),
+  closeReceiptDialog: document.getElementById('close-receipt-dialog'),
+
+  // Currency Modal
+  currencyDialog: document.getElementById('currency-dialog'),
+  currencyForm: document.getElementById('currency-form'),
+  rateUsd: document.getElementById('rate-usd'),
+  rateEur: document.getElementById('rate-eur'),
+  rateGbp: document.getElementById('rate-gbp'),
+  rateGld: document.getElementById('rate-gld'),
+  closeCurrencyDialog: document.getElementById('close-currency-dialog'),
+  cancelCurrencyBtn: document.getElementById('cancel-currency-btn'),
 
   // Annual Report Modal
   annualDialog: document.getElementById('annual-dialog'),
@@ -291,6 +350,47 @@ document.querySelectorAll('.amount-chips').forEach((chipContainer) => {
   });
 });
 
+// ---------- Fiş Fotoğrafı Sıkıştırma ----------
+
+if (els.txReceiptInput) {
+  els.txReceiptInput.addEventListener('change', async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      const reader = new FileReader();
+      reader.onload = (re) => {
+        const img = new Image();
+        img.onload = () => {
+          const maxDim = 600;
+          let w = img.width;
+          let h = img.height;
+          if (w > maxDim || h > maxDim) {
+            if (w > h) {
+              h = Math.round((h * maxDim) / w);
+              w = maxDim;
+            } else {
+              w = Math.round((w * maxDim) / h);
+              h = maxDim;
+            }
+          }
+          const canvas = document.createElement('canvas');
+          canvas.width = w;
+          canvas.height = h;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, w, h);
+          pendingReceiptData = canvas.toDataURL('image/jpeg', 0.7);
+          els.txReceiptStatus.textContent = '✓ Fiş fotoğrafı eklendi';
+        };
+        img.src = re.target.result;
+      };
+      reader.readAsDataURL(file);
+    } catch {
+      status('Fiş fotoğrafı işlenemedi.', 'error');
+    }
+  });
+}
+
 // ---------- Akıllı Tek Satır Hızlı Giriş ----------
 
 if (els.quickEntryForm) {
@@ -299,15 +399,17 @@ if (els.quickEntryForm) {
     const text = els.quickEntryInput.value.trim();
     if (!text) return;
 
-    const parsed = parseQuickEntry(text, state.customCategories);
+    const parsed = parseQuickEntry(text, state.customCategories, state);
     if (!parsed) {
-      status('Anlaşılamadı — örn: "market 350", "kahve 85", "maaş 65000"', 'error');
+      status('Anlaşılamadı — örn: "market 350", "kahve 85", "$100 freelance"', 'error');
       return;
     }
 
     const t = addTransaction(state, {
       type: parsed.type,
       amount: parsed.amount,
+      originalAmount: parsed.originalAmount,
+      currency: parsed.currency,
       categoryId: parsed.categoryId,
       date: getDefaultDateForPeriod(currentPeriod),
       note: parsed.note,
@@ -352,6 +454,9 @@ function paint() {
   const heatmapData = dailyExpenseHeatmap(state, currentPeriod);
   renderCalendarHeatmap(els.heatmapHost, heatmapData);
 
+  const instData = installmentStats(state, currentPeriod);
+  renderInstallmentList(els.installmentsList, instData);
+
   renderGoalsList(els.goalsList, state.goals);
   renderBudgetList(els.budgetList, budgetStatus(state, currentPeriod));
   renderRecurringList(els.recurringList, state.recurring, state.customCategories);
@@ -361,6 +466,7 @@ function paint() {
 function refreshCategorySelects() {
   fillCategorySelect(els.txCategory, els.txType.value || 'expense', state.customCategories);
   fillCategorySelect(els.recCategory, els.recType.value || 'expense', state.customCategories);
+  fillCategorySelect(els.instCategory, 'expense', state.customCategories);
   fillBudgetCategorySelect(els.budgetCategory, state.customCategories);
 }
 
@@ -390,6 +496,26 @@ if (els.heatmapHost) {
   });
 }
 
+// ---------- Fiş Önizleme Tıklaması ----------
+
+if (els.txList) {
+  els.txList.addEventListener('click', (e) => {
+    const receiptBtn = e.target.closest('[data-preview-receipt]');
+    if (!receiptBtn) return;
+    const txId = receiptBtn.dataset.previewReceipt;
+    const t = state.transactions.find((tx) => tx.id === txId);
+    if (!t || !t.receiptImage) return;
+
+    els.receiptPreviewImg.src = t.receiptImage;
+    if (els.receiptDialog.showModal) els.receiptDialog.showModal();
+    else els.receiptDialog.setAttribute('open', '');
+  });
+}
+
+if (els.closeReceiptDialog) {
+  els.closeReceiptDialog.addEventListener('click', () => els.receiptDialog.close());
+}
+
 // ---------- Tema ve Gizlilik Butonları ----------
 
 if (els.themeToggleBtn) {
@@ -409,6 +535,266 @@ if (els.privacyToggleBtn) {
     updatePrivacyIcon();
     paint();
     status(next ? 'Gizlilik modu aktif (tutarlar gizlendi).' : 'Gizlilik modu kapatıldı.');
+  });
+}
+
+// ---------- Web Paylaşımı & Yazdır / PDF ----------
+
+if (els.shareBtn) {
+  els.shareBtn.addEventListener('click', async () => {
+    const totals = monthTotals(state, currentPeriod);
+    const sRate = savingsRate(totals);
+    const text = `📊 Bütçe Defteri (${monthLabel(currentPeriod)}):
+• Toplam Gelir: ₺${totals.income.toLocaleString('tr-TR')}
+• Toplam Gider: ₺${totals.expense.toLocaleString('tr-TR')}
+• Net Bütçe: ₺${totals.net.toLocaleString('tr-TR')}
+• Tasarruf Oranı: %${sRate}`;
+
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: `Bütçe Defteri - ${monthLabel(currentPeriod)}`,
+          text,
+        });
+      } catch {}
+    } else {
+      await navigator.clipboard.writeText(text);
+      status('Aylık finans özeti panoya kopyalandı.');
+    }
+  });
+}
+
+if (els.printBtn) {
+  els.printBtn.addEventListener('click', () => {
+    window.print();
+  });
+}
+
+// ---------- Taksitli Harcama / Borç Planlayıcı ----------
+
+function updateInstallmentMonthlyPreview() {
+  const total = Number(els.instTotalAmt.value) || 0;
+  const count = Number(els.instCount.value) || 1;
+  const monthly = total > 0 && count > 0 ? (total / count).toFixed(2) : '0.00';
+  els.instMonthlyPreview.textContent = `₺${monthly}`;
+}
+
+if (els.instTotalAmt) els.instTotalAmt.addEventListener('input', updateInstallmentMonthlyPreview);
+if (els.instCount) els.instCount.addEventListener('input', updateInstallmentMonthlyPreview);
+
+if (els.addInstallmentBtn) {
+  els.addInstallmentBtn.addEventListener('click', () => {
+    els.installmentForm.reset();
+    els.instStartPeriod.value = currentPeriod;
+    updateInstallmentMonthlyPreview();
+    if (els.installmentDialog.showModal) els.installmentDialog.showModal();
+    else els.installmentDialog.setAttribute('open', '');
+  });
+}
+
+if (els.closeInstDialog) els.closeInstDialog.addEventListener('click', () => els.installmentDialog.close());
+if (els.cancelInstBtn) els.cancelInstBtn.addEventListener('click', () => els.installmentDialog.close());
+
+if (els.installmentForm) {
+  els.installmentForm.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const form = new FormData(els.installmentForm);
+    const ins = addInstallment(state, {
+      name: form.get('name'),
+      totalAmount: form.get('totalAmount'),
+      totalInstallments: form.get('totalInstallments'),
+      startPeriod: form.get('startPeriod') || currentPeriod,
+      categoryId: form.get('categoryId'),
+    });
+
+    if (!ins) {
+      status('Taksit planı eklenemedi.', 'error');
+      return;
+    }
+
+    materializeInstallments(state, currentPeriod);
+    persist();
+    paint();
+    els.installmentDialog.close();
+    status(`"${ins.name}" taksit planı oluşturuldu.`);
+  });
+}
+
+if (els.installmentsList) {
+  els.installmentsList.addEventListener('click', (e) => {
+    const delBtn = e.target.closest('[data-delete-inst]');
+    if (!delBtn) return;
+    removeInstallment(state, delBtn.dataset.deleteInst);
+    persist();
+    paint();
+    status('Taksit planı silindi.');
+  });
+}
+
+// ---------- Bütçe Simülatörü ----------
+
+function updateSimulation() {
+  const catId = els.simCategorySelect.value || null;
+  const cutPct = Number(els.simCutRange.value) || 0;
+  const incomePct = Number(els.simIncomeRange.value) || 0;
+
+  els.simCutVal.textContent = `%${cutPct} Kıs`;
+  els.simIncomeVal.textContent = `+${incomePct}% Artış`;
+
+  const simResult = simulateScenario(state, currentPeriod, {
+    cutCategoryId: catId,
+    cutPercent: cutPct,
+    incomeBoostPercent: incomePct,
+  });
+
+  renderSimulator(els.simulatorResultsHost, simResult, state.customCategories);
+}
+
+if (els.simulatorBtn) {
+  els.simulatorBtn.addEventListener('click', () => {
+    // Kategori seçeneklerini doldur
+    fillCategorySelect(els.simCategorySelect, 'expense', state.customCategories);
+    updateSimulation();
+    if (els.simulatorDialog.showModal) els.simulatorDialog.showModal();
+    else els.simulatorDialog.setAttribute('open', '');
+  });
+}
+
+if (els.closeSimulator) els.closeSimulator.addEventListener('click', () => els.simulatorDialog.close());
+if (els.simCutRange) els.simCutRange.addEventListener('input', updateSimulation);
+if (els.simIncomeRange) els.simIncomeRange.addEventListener('input', updateSimulation);
+if (els.simCategorySelect) els.simCategorySelect.addEventListener('change', updateSimulation);
+
+// ---------- Komut Paleti (Command Palette) ----------
+
+let paletteItems = [];
+let paletteSelectedIndex = 0;
+
+function getAvailableCommands() {
+  return [
+    { title: 'Detaylı İşlem Ekle', sub: 'İşlem formuna odaklan', icon: '➕', action: () => els.txAmountInput.focus() },
+    { title: 'Taksitli Harcama Ekle', sub: 'Yeni taksitli borç planı oluştur', icon: '💳', action: () => els.addInstallmentBtn.click() },
+    { title: 'Yeni Birikim Hedefi Ekle', sub: 'Kumbara hedefi oluştur', icon: '🎯', action: () => els.addGoalBtn.click() },
+    { title: 'Bütçe Simülatörü', sub: 'Ne Olursa? projeksiyonu', icon: '🎮', action: () => els.simulatorBtn.click() },
+    { title: 'Yıllık Finans Özeti', sub: '12 aylık kümülatif rapor', icon: '📊', action: () => els.annualReportBtn.click() },
+    { title: 'Gizlilik Modunu Aç/Kapat', sub: 'Tutarları gizle veya göster', icon: '👁️', action: () => els.privacyToggleBtn.click() },
+    { title: 'Koyu / Açık Tema Değiştir', sub: 'Arayüz rengini ayarla', icon: '🌓', action: () => els.themeToggleBtn.click() },
+    { title: 'Döviz & Kur Ayarları', sub: 'USD, EUR, GBP kurlarını yönet', icon: '💱', action: () => els.currencyBtn.click() },
+    { title: 'PDF / Yazdır', sub: 'Raporu yazdır veya kaydet', icon: '📄', action: () => els.printBtn.click() },
+    { title: 'Bu Aya Git', sub: 'Geçerli takvim ayına dön', icon: '📅', action: () => { currentPeriod = periodKey(); paint(); } },
+    { title: 'Önceki Aya Git', sub: 'Geçmiş ayı incele', icon: '◀️', action: () => els.prevMonth.click() },
+    { title: 'Sonraki Aya Git', sub: 'Gelecek ayı incele', icon: '▶️', action: () => els.nextMonth.click() },
+    { title: 'Excel / CSV İndir', sub: 'İşlemleri dışa aktar', icon: '📥', action: () => els.exportCsvBtn.click() },
+  ];
+}
+
+function updateCommandPalette() {
+  const q = els.paletteSearch.value.toLowerCase().trim();
+  const allCmds = getAvailableCommands();
+
+  // İşlemleri de aramaya dahil et
+  const txMatches = state.transactions
+    .filter((t) => (t.note || '').toLowerCase().includes(q))
+    .slice(0, 5)
+    .map((t) => ({
+      title: `${t.type === 'income' ? '+' : '−'}₺${t.amount} (${t.note || 'İşlem'})`,
+      sub: `${t.date} · İşleme git`,
+      icon: t.type === 'income' ? '📈' : '📉',
+      action: () => {
+        currentPeriod = t.date.slice(0, 7);
+        paint();
+        txSearchQuery = t.note || '';
+        els.txSearchInput.value = txSearchQuery;
+      },
+    }));
+
+  paletteItems = q
+    ? allCmds.filter((c) => c.title.toLowerCase().includes(q) || c.sub.toLowerCase().includes(q)).concat(txMatches)
+    : allCmds;
+
+  paletteSelectedIndex = 0;
+  renderCommandPalette(els.paletteList, paletteItems, paletteSelectedIndex);
+}
+
+function openCommandPalette() {
+  els.paletteSearch.value = '';
+  updateCommandPalette();
+  if (els.commandDialog.showModal) els.commandDialog.showModal();
+  else els.commandDialog.setAttribute('open', '');
+  setTimeout(() => els.paletteSearch.focus(), 50);
+}
+
+if (els.commandBtn) els.commandBtn.addEventListener('click', openCommandPalette);
+
+window.addEventListener('keydown', (e) => {
+  if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+    e.preventDefault();
+    openCommandPalette();
+  }
+});
+
+if (els.paletteSearch) {
+  els.paletteSearch.addEventListener('input', updateCommandPalette);
+  els.paletteSearch.addEventListener('keydown', (e) => {
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      paletteSelectedIndex = (paletteSelectedIndex + 1) % Math.max(paletteItems.length, 1);
+      renderCommandPalette(els.paletteList, paletteItems, paletteSelectedIndex);
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      paletteSelectedIndex = (paletteSelectedIndex - 1 + paletteItems.length) % Math.max(paletteItems.length, 1);
+      renderCommandPalette(els.paletteList, paletteItems, paletteSelectedIndex);
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      const selected = paletteItems[paletteSelectedIndex];
+      if (selected && selected.action) {
+        els.commandDialog.close();
+        selected.action();
+      }
+    }
+  });
+}
+
+if (els.paletteList) {
+  els.paletteList.addEventListener('click', (e) => {
+    const item = e.target.closest('[data-palette-index]');
+    if (!item) return;
+    const idx = Number(item.dataset.paletteIndex);
+    const selected = paletteItems[idx];
+    if (selected && selected.action) {
+      els.commandDialog.close();
+      selected.action();
+    }
+  });
+}
+
+// ---------- Döviz & Kur Ayarları Modalı ----------
+
+if (els.currencyBtn) {
+  els.currencyBtn.addEventListener('click', () => {
+    const c = state.currencies || { USD: 33.5, EUR: 36.8, GBP: 43.0, GLD: 2600.0 };
+    els.rateUsd.value = c.USD;
+    els.rateEur.value = c.EUR;
+    els.rateGbp.value = c.GBP;
+    els.rateGld.value = c.GLD;
+    if (els.currencyDialog.showModal) els.currencyDialog.showModal();
+    else els.currencyDialog.setAttribute('open', '');
+  });
+}
+
+if (els.closeCurrencyDialog) els.closeCurrencyDialog.addEventListener('click', () => els.currencyDialog.close());
+if (els.cancelCurrencyBtn) els.cancelCurrencyBtn.addEventListener('click', () => els.currencyDialog.close());
+
+if (els.currencyForm) {
+  els.currencyForm.addEventListener('submit', (e) => {
+    e.preventDefault();
+    setCurrencyRate(state, 'USD', els.rateUsd.value);
+    setCurrencyRate(state, 'EUR', els.rateEur.value);
+    setCurrencyRate(state, 'GBP', els.rateGbp.value);
+    setCurrencyRate(state, 'GLD', els.rateGld.value);
+    persist();
+    els.currencyDialog.close();
+    status('Döviz kurları güncellendi.');
   });
 }
 
@@ -488,14 +874,14 @@ if (els.closeAnnualDialog) {
 
 els.prevMonth.addEventListener('click', () => {
   currentPeriod = shiftPeriod(currentPeriod, -1);
-  if (materializeRecurring(state, currentPeriod) > 0) persist();
+  if (materializeRecurring(state, currentPeriod) > 0 || materializeInstallments(state, currentPeriod) > 0) persist();
   els.txForm.date.value = getDefaultDateForPeriod(currentPeriod);
   paint();
 });
 
 els.nextMonth.addEventListener('click', () => {
   currentPeriod = shiftPeriod(currentPeriod, 1);
-  if (materializeRecurring(state, currentPeriod) > 0) persist();
+  if (materializeRecurring(state, currentPeriod) > 0 || materializeInstallments(state, currentPeriod) > 0) persist();
   els.txForm.date.value = getDefaultDateForPeriod(currentPeriod);
   paint();
 });
@@ -539,22 +925,33 @@ wireSegmented(els.txForm.querySelector('.segmented'), els.txType, (type) => {
 els.txForm.addEventListener('submit', (event) => {
   event.preventDefault();
   const form = new FormData(els.txForm);
+  const rawAmt = Number(form.get('amount'));
+  const currency = form.get('currency') || 'TRY';
+  const convertedAmt = convertToTRY(rawAmt, currency, state);
+
   const t = addTransaction(state, {
     type: form.get('type'),
-    amount: form.get('amount'),
+    amount: convertedAmt,
+    originalAmount: rawAmt,
+    currency,
     categoryId: form.get('categoryId'),
     date: form.get('date'),
     note: form.get('note'),
+    receiptImage: pendingReceiptData,
   });
+
   if (!t) {
     status('İşlem eklenemedi — tutarı ve tarihi kontrol et.', 'error');
     return;
   }
+
   persist();
   const addedPeriod = t.date.slice(0, 7);
   if (addedPeriod !== currentPeriod) currentPeriod = addedPeriod;
   paint();
   els.txForm.reset();
+  pendingReceiptData = null;
+  els.txReceiptStatus.textContent = '';
   els.txForm.date.value = getDefaultDateForPeriod(currentPeriod);
   fillCategorySelect(els.txCategory, 'expense', state.customCategories);
   setSegmentedValue(els.txForm.querySelector('.segmented'), els.txType, 'expense');
@@ -999,6 +1396,7 @@ els.resetConfirm.addEventListener('click', (event) => {
     state.recurring = [];
     state.customCategories = [];
     state.goals = [];
+    state.installments = [];
     state.budgets = {};
     state.materialized = {};
     persist();

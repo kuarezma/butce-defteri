@@ -189,20 +189,33 @@ export function computeFiftyThirtyTwenty(state, period) {
 
 /**
  * Akıllı Tek Satır Hızlı Giriş Ayrıştırıcı (Smart Quick Entry Parser)
- * "market 350", "kahve 85 arkadaşla", "maaş 65000", "benzin 1200", "kira 15000"
+ * "market 350", "kahve 85 arkadaşla", "maaş 65000", "$100 freelance", "€50 amazon"
  */
-export function parseQuickEntry(rawText, customCategories = []) {
+export function parseQuickEntry(rawText, customCategories = [], state = null) {
   if (!rawText || typeof rawText !== 'string') return null;
   const text = rawText.trim();
   if (!text) return null;
 
-  // Tutarı bul (örn. 350, 45.50, 1200 TL, ₺500)
-  const amountMatch = text.match(/(?:₺\s*)?(\d+(?:[.,]\d+)?)(?:\s*(?:tl|₺))?/i);
+  // Döviz tespiti
+  let currency = 'TRY';
+  if (/\$|usd/i.test(text)) currency = 'USD';
+  else if (/€|eur/i.test(text)) currency = 'EUR';
+  else if (/£|gbp/i.test(text)) currency = 'GBP';
+  else if (/altın|gld/i.test(text)) currency = 'GLD';
+
+  // Tutarı bul (örn. 350, 45.50, 1200 TL, ₺500, $100, €50)
+  const amountMatch = text.match(/(?:[₺$€£]\s*)?(\d+(?:[.,]\d+)?)(?:\s*(?:tl|₺|usd|eur|gbp|\$|€|£|gr|gram))?/i);
   if (!amountMatch) return null;
 
   const rawAmountStr = amountMatch[1].replace(',', '.');
-  const amount = parseFloat(rawAmountStr);
-  if (!Number.isFinite(amount) || amount <= 0) return null;
+  const originalAmount = parseFloat(rawAmountStr);
+  if (!Number.isFinite(originalAmount) || originalAmount <= 0) return null;
+
+  let amount = originalAmount;
+  if (currency !== 'TRY' && state && state.currencies) {
+    const rate = state.currencies[currency] || 1;
+    amount = Number((originalAmount * rate).toFixed(2));
+  }
 
   const textWithoutAmount = text.replace(amountMatch[0], '').trim();
   const lower = textWithoutAmount.toLowerCase();
@@ -247,7 +260,92 @@ export function parseQuickEntry(rawText, customCategories = []) {
     type: matchedType,
     categoryId: matchedCatId,
     amount,
+    originalAmount,
+    currency,
     note,
+  };
+}
+
+/**
+ * Taksit Durum Özeti & Kalan Borç Hesaplaması
+ */
+export function installmentStats(state, currentPeriod) {
+  if (!state.installments || state.installments.length === 0) {
+    return { list: [], totalMonthly: 0, totalRemainingDebt: 0 };
+  }
+
+  const [curY, curM] = currentPeriod.split('-').map(Number);
+  let totalMonthly = 0;
+  let totalRemainingDebt = 0;
+
+  const list = state.installments.map((ins) => {
+    const [startY, startM] = ins.startPeriod.split('-').map(Number);
+    const monthDiff = (curY - startY) * 12 + (curM - startM);
+    const currentInstallment = Math.max(0, Math.min(ins.totalInstallments, monthDiff + 1));
+    const paidCount = Math.max(0, Math.min(ins.totalInstallments, monthDiff));
+    const remainingCount = Math.max(0, ins.totalInstallments - paidCount);
+    const remainingDebt = Number((remainingCount * ins.monthlyAmount).toFixed(2));
+    const isActiveThisMonth = ins.active && monthDiff >= 0 && monthDiff < ins.totalInstallments;
+
+    if (isActiveThisMonth) totalMonthly += ins.monthlyAmount;
+    if (ins.active) totalRemainingDebt += remainingDebt;
+
+    return {
+      ...ins,
+      category: categoryById(ins.categoryId, state.customCategories) || { id: ins.categoryId, name: 'Diğer', icon: '💳' },
+      currentInstallment,
+      remainingCount,
+      remainingDebt,
+      isActiveThisMonth,
+      progressPct: Math.round((paidCount / ins.totalInstallments) * 100),
+    };
+  });
+
+  return {
+    list,
+    totalMonthly: Number(totalMonthly.toFixed(2)),
+    totalRemainingDebt: Number(totalRemainingDebt.toFixed(2)),
+  };
+}
+
+/**
+ * Bütçe Simülatörü ("Ne Olursa?" Senaryoları)
+ */
+export function simulateScenario(state, period, options = {}) {
+  const totals = monthTotals(state, period);
+  const {
+    cutCategoryId = null,
+    cutPercent = 0,
+    incomeBoostPercent = 0,
+  } = options;
+
+  let categoryExpense = 0;
+  if (cutCategoryId) {
+    const txs = transactionsInMonth(state, period).filter((t) => t.type === 'expense' && t.categoryId === cutCategoryId);
+    categoryExpense = txs.reduce((sum, t) => sum + t.amount, 0);
+  }
+
+  const monthlyCutSavings = Math.round((categoryExpense * cutPercent) / 100);
+  const yearlyCutSavings = monthlyCutSavings * 12;
+
+  const extraIncome = Math.round((totals.income * incomeBoostPercent) / 100);
+  const newIncome = totals.income + extraIncome;
+  const newExpense = Math.max(0, totals.expense - monthlyCutSavings);
+  const newNet = newIncome - newExpense;
+  const newSavingsRate = newIncome > 0 ? Math.round((newNet / newIncome) * 100) : 0;
+
+  return {
+    currentIncome: totals.income,
+    currentExpense: totals.expense,
+    currentNet: totals.net,
+    categoryExpense,
+    monthlyCutSavings,
+    yearlyCutSavings,
+    newIncome,
+    newExpense,
+    newNet,
+    newSavingsRate,
+    netImprovement: newNet - totals.net,
   };
 }
 

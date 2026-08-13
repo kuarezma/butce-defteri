@@ -2,7 +2,7 @@
 <html lang="tr">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no" />
     <meta name="theme-color" content="#07090e" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
@@ -12,7 +12,7 @@
     <link rel="manifest" href="/manifest.webmanifest" />
 
     <title>Bütçe Defteri — Akıllı Gelir & Gider Takibi</title>
-    <meta name="description" content="Kişisel bütçe, gelir-gider, birikim hedefleri, 50/30/20 analizi ve tekrarlayan harcama takibi." />
+    <meta name="description" content="Kişisel bütçe, gelir-gider, taksitli borç takibi, birikim hedefleri, 50/30/20 analizi ve bütçe simülatörü." />
 
     <!-- Google Fonts: Plus Jakarta Sans & Outfit -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -33,6 +33,21 @@
           </div>
 
           <div class="header-actions">
+            <button type="button" class="icon-btn" id="command-btn" aria-label="Komut Paleti" title="Hızlı Komut Paleti (Cmd+K)">
+              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 3a3 3 0 0 0-3 3v12a3 3 0 0 0 3 3 3 3 0 0 0 3-3 3 3 0 0 0-3-3H6a3 3 0 0 0-3 3 3 3 0 0 0 3 3 3 3 0 0 0 3-3V6a3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3h12a3 3 0 0 0 3-3 3 3 0 0 0-3-3z"/></svg>
+            </button>
+            <button type="button" class="icon-btn" id="simulator-btn" aria-label="Bütçe Simülatörü" title="Ne Olursa? Bütçe Simülatörü">
+              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="16" height="20" x="4" y="2" rx="2"/><line x1="8" x2="16" y1="6" y2="6"/><line x1="16" x2="16" y1="14" y2="18"/><path d="M16 10h.01"/><path d="M12 10h.01"/><path d="M8 10h.01"/><path d="M12 14h.01"/><path d="M8 14h.01"/><path d="M12 18h.01"/><path d="M8 18h.01"/></svg>
+            </button>
+            <button type="button" class="icon-btn" id="currency-btn" aria-label="Döviz Kurları" title="Döviz & Kur Ayarları">
+              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" x2="22" y1="12" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+            </button>
+            <button type="button" class="icon-btn" id="share-btn" aria-label="Özeti Paylaş" title="Aylık Finans Özetini Paylaş">
+              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" x2="15.42" y1="13.51" y2="17.49"/><line x1="15.41" x2="8.59" y1="6.51" y2="10.49"/></svg>
+            </button>
+            <button type="button" class="icon-btn" id="print-btn" aria-label="PDF / Yazdır" title="Yazdır / PDF Olarak Kaydet">
+              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect width="12" height="8" x="6" y="14"/></svg>
+            </button>
             <button type="button" class="icon-btn" id="privacy-toggle-btn" aria-label="Gizlilik Modu" title="Bakiyeleri Gizle/Göster">
               <span id="privacy-icon"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg></span>
             </button>
@@ -119,7 +134,7 @@
               <span class="quick-entry-icon">
                 <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
               </span>
-              <input type="text" id="quick-entry-input" placeholder="Akıllı hızlı giriş: ör. 'market 350', 'kahve 85', 'maaş 65000'..." autocomplete="off" />
+              <input type="text" id="quick-entry-input" placeholder="Akıllı hızlı giriş: ör. 'market 350', '$100 freelance', 'maaş 65000'..." autocomplete="off" />
               <button type="submit" class="btn btn-primary btn-sm" id="quick-entry-btn">Hızlı Ekle</button>
             </div>
           </form>
@@ -140,12 +155,22 @@
             </div>
             <input type="hidden" name="type" id="tx-type" value="expense" />
 
-            <div class="field-row">
-              <label class="field">
-                <span>Tutar (₺)</span>
+            <div class="field-row field-row-3">
+              <label class="field" style="flex: 2;">
+                <span>Tutar</span>
                 <input type="number" name="amount" id="tx-amount-input" inputmode="decimal" step="0.01" min="0.01" placeholder="0.00" required />
               </label>
-              <label class="field">
+              <label class="field" style="max-width: 100px;">
+                <span>Birim</span>
+                <select name="currency" id="tx-currency">
+                  <option value="TRY">TRY (₺)</option>
+                  <option value="USD">USD ($)</option>
+                  <option value="EUR">EUR (€)</option>
+                  <option value="GBP">GBP (£)</option>
+                  <option value="GLD">Altın (gr)</option>
+                </select>
+              </label>
+              <label class="field" style="flex: 2;">
                 <span>Tarih</span>
                 <input type="date" name="date" required />
               </label>
@@ -169,6 +194,15 @@
               <span>Not (opsiyonel)</span>
               <input type="text" name="note" maxlength="120" placeholder="ör. Hafta sonu market alışverişi" />
             </label>
+
+            <div class="field-row file-upload-row">
+              <label class="btn btn-secondary btn-sm file-label">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/></svg>
+                <span>Fiş / Fatura Fotoğrafı Ekle</span>
+                <input type="file" id="tx-receipt-input" accept="image/*" capture="environment" hidden />
+              </label>
+              <span id="tx-receipt-status" class="receipt-status-text"></span>
+            </div>
 
             <button type="submit" class="btn btn-primary btn-block">
               <span>İşlemi Kaydet</span>
@@ -202,6 +236,21 @@
           </div>
 
           <ul class="tx-list" id="tx-list"></ul>
+        </section>
+
+        <!-- 💳 Taksitli Harcamalar & Borç Planlayıcı -->
+        <section class="card glass-card wide" id="installments-card-section">
+          <div class="card-head">
+            <h2>
+              <span class="card-head-icon"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="20" height="14" x="2" y="5" rx="2"/><line x1="2" x2="22" y1="10" y2="10"/></svg></span>
+              Taksitli Harcamalar & Borç Takibi
+            </h2>
+            <button type="button" class="btn btn-sm btn-secondary" id="add-installment-btn">
+              <span>+ Yeni Taksit Planı</span>
+            </button>
+          </div>
+          <p class="card-desc">Telefon, beyaz eşya veya kredi kartı taksitlerini kaydet; ilgili aya otomatik işlensin, kalan borcunu takip et.</p>
+          <ul class="installments-list" id="installments-list"></ul>
         </section>
 
         <!-- 🎯 Hedef Birikimler (Kumbara) -->
@@ -360,7 +409,7 @@
         </div>
 
         <div class="confirm glass-confirm" id="reset-confirm" hidden>
-          <span>Tüm işlemler, tekrarlayanlar, hedefler ve limitler silinecek. Emin misin?</span>
+          <span>Tüm işlemler, tekrarlayanlar, hedefler, taksitler ve limitler silinecek. Emin misin?</span>
           <button type="button" class="btn btn-danger" data-action="reset-yes">Evet, sıfırla</button>
           <button type="button" class="btn btn-secondary" data-action="reset-no">Vazgeç</button>
         </div>
@@ -373,6 +422,156 @@
         </p>
       </footer>
     </div>
+
+    <!-- Taksitli Harcama Ekleme Modalı -->
+    <dialog id="installment-dialog" class="glass-modal">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3>Yeni Taksitli Harcama / Borç Planı</h3>
+          <button type="button" class="icon-btn close-btn" id="close-inst-dialog" aria-label="Kapat">
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+          </button>
+        </div>
+        <form id="installment-form" class="tx-form">
+          <label class="field">
+            <span>Harcama / Ürün Adı</span>
+            <input type="text" name="name" maxlength="60" placeholder="ör. iPhone 15 Pro, Çamaşır Makinesi" required />
+          </label>
+
+          <div class="field-row">
+            <label class="field">
+              <span>Toplam Borç Tutarı (₺)</span>
+              <input type="number" name="totalAmount" id="inst-total-amt" min="1" step="0.01" placeholder="36000" required />
+            </label>
+            <label class="field">
+              <span>Taksit Sayısı (Ay)</span>
+              <input type="number" name="totalInstallments" id="inst-count" min="2" max="60" value="6" required />
+            </label>
+          </div>
+
+          <div class="field-row">
+            <label class="field">
+              <span>Başlangıç Ayı</span>
+              <input type="month" name="startPeriod" id="inst-start-period" required />
+            </label>
+            <label class="field">
+              <span>Kategori</span>
+              <select name="categoryId" id="inst-category" required></select>
+            </label>
+          </div>
+
+          <div class="inst-preview-calc" id="inst-calc-preview">
+            <span>Aylık Ödenecek Tutar: <strong id="inst-monthly-preview">₺0.00</strong></span>
+          </div>
+
+          <div class="modal-actions">
+            <button type="button" class="btn btn-secondary" id="cancel-inst-btn">İptal</button>
+            <button type="submit" class="btn btn-primary">Taksit Planını Başlat</button>
+          </div>
+        </form>
+      </div>
+    </dialog>
+
+    <!-- Bütçe Simülatörü Modalı -->
+    <dialog id="simulator-dialog" class="glass-modal wide-modal">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3>🎮 "Ne Olursa?" Bütçe Projeksiyon Simülatörü</h3>
+          <button type="button" class="icon-btn close-btn" id="close-simulator" aria-label="Kapat">
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+          </button>
+        </div>
+        
+        <div class="sim-controls">
+          <div class="sim-slider-row">
+            <div class="slider-header">
+              <span>📉 Kategori Harcamasını Kıs</span>
+              <select id="sim-category-select"></select>
+              <strong id="sim-cut-val">%20 Kıs</strong>
+            </div>
+            <input type="range" id="sim-cut-range" min="0" max="80" step="5" value="20" />
+          </div>
+
+          <div class="sim-slider-row">
+            <div class="slider-header">
+              <span>📈 Gelir Artışı / Ek Gelir</span>
+              <strong id="sim-income-val">+%15 Artış</strong>
+            </div>
+            <input type="range" id="sim-income-range" min="0" max="100" step="5" value="15" />
+          </div>
+        </div>
+
+        <div id="simulator-results-host"></div>
+      </div>
+    </dialog>
+
+    <!-- Hızlı Komut Paleti (Command Palette) Modalı -->
+    <dialog id="command-dialog" class="glass-modal command-palette-dialog">
+      <div class="modal-content palette-content">
+        <div class="palette-input-box">
+          <span class="palette-search-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+          </span>
+          <input type="text" id="palette-search" placeholder="Komut veya işlem ara... (ör. 'gelir ekle', 'yıllık', 'market', 'koyu tema')" autocomplete="off" />
+          <kbd class="palette-kbd">ESC</kbd>
+        </div>
+        <div class="palette-list" id="palette-list"></div>
+      </div>
+    </dialog>
+
+    <!-- Fiş Görseli Önizleme Modalı -->
+    <dialog id="receipt-dialog" class="glass-modal">
+      <div class="modal-content" style="max-width: 480px; text-align: center;">
+        <div class="modal-header">
+          <h3>Fiş / Fatura Fotoğrafı</h3>
+          <button type="button" class="icon-btn close-btn" id="close-receipt-dialog" aria-label="Kapat">
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+          </button>
+        </div>
+        <div class="receipt-img-container">
+          <img id="receipt-preview-img" src="" alt="Fiş fotoğrafı" style="max-width: 100%; max-height: 70vh; border-radius: 12px;" />
+        </div>
+      </div>
+    </dialog>
+
+    <!-- Döviz Kurları Modalı -->
+    <dialog id="currency-dialog" class="glass-modal">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3>Döviz & Kur Ayarları</h3>
+          <button type="button" class="icon-btn close-btn" id="close-currency-dialog" aria-label="Kapat">
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+          </button>
+        </div>
+        <form id="currency-form" class="tx-form">
+          <p class="card-desc">Farklı para birimlerinde girilen işlemlerin TL karşılığını hesaplamak için kullanılan kurlar:</p>
+          <div class="field-row">
+            <label class="field">
+              <span>USD ($) / TRY</span>
+              <input type="number" step="0.01" id="rate-usd" required />
+            </label>
+            <label class="field">
+              <span>EUR (€) / TRY</span>
+              <input type="number" step="0.01" id="rate-eur" required />
+            </label>
+          </div>
+          <div class="field-row">
+            <label class="field">
+              <span>GBP (£) / TRY</span>
+              <input type="number" step="0.01" id="rate-gbp" required />
+            </label>
+            <label class="field">
+              <span>Altın (Gram) / TRY</span>
+              <input type="number" step="0.01" id="rate-gld" required />
+            </label>
+          </div>
+          <div class="modal-actions">
+            <button type="button" class="btn btn-secondary" id="cancel-currency-btn">Kapat</button>
+            <button type="submit" class="btn btn-primary">Kurları Güncelle</button>
+          </div>
+        </form>
+      </div>
+    </dialog>
 
     <!-- İşlem Düzenleme Modalı -->
     <dialog id="edit-tx-dialog" class="glass-modal">

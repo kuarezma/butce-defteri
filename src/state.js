@@ -22,6 +22,8 @@ function emptyState() {
     recurring: [],
     customCategories: [], // [{ id, type, name, icon, bucket, active }]
     goals: [], // [{ id, name, targetAmount, currentAmount, targetDate, icon }]
+    installments: [], // [{ id, name, totalAmount, monthlyAmount, totalInstallments, startPeriod, categoryId, note, active }]
+    currencies: { USD: 33.5, EUR: 36.8, GBP: 43.0, GLD: 2600.0 },
     budgets: {}, // { [categoryId]: monthlyLimit }
     materialized: {}, // { "YYYY-MM": [recurringId, ...] }
     createdAt: now,
@@ -95,6 +97,27 @@ function normalizeGoal(g) {
   };
 }
 
+function normalizeInstallment(ins) {
+  if (!ins || typeof ins !== 'object') return null;
+  if (typeof ins.name !== 'string' || !ins.name.trim()) return null;
+  const totalAmount = Number(ins.totalAmount);
+  const totalInstallments = Number(ins.totalInstallments);
+  if (!Number.isFinite(totalAmount) || totalAmount <= 0) return null;
+  if (!Number.isInteger(totalInstallments) || totalInstallments < 2 || totalInstallments > 60) return null;
+  const monthlyAmount = Number((totalAmount / totalInstallments).toFixed(2));
+  return {
+    id: typeof ins.id === 'string' && ins.id ? ins.id : `inst-${uid()}`,
+    name: ins.name.trim(),
+    totalAmount,
+    monthlyAmount,
+    totalInstallments,
+    startPeriod: typeof ins.startPeriod === 'string' && /^\d{4}-\d{2}$/.test(ins.startPeriod) ? ins.startPeriod : periodKey(),
+    categoryId: typeof ins.categoryId === 'string' && ins.categoryId ? ins.categoryId : 'gider-diger',
+    note: typeof ins.note === 'string' ? ins.note : '',
+    active: ins.active !== false,
+  };
+}
+
 function normalizeTransaction(t) {
   if (!t || typeof t !== 'object') return null;
   const amount = Number(t.amount);
@@ -106,10 +129,14 @@ function normalizeTransaction(t) {
     id: typeof t.id === 'string' && t.id ? t.id : uid(),
     type: t.type,
     amount,
+    currency: typeof t.currency === 'string' ? t.currency : 'TRY',
+    originalAmount: Number.isFinite(Number(t.originalAmount)) && Number(t.originalAmount) > 0 ? Number(t.originalAmount) : amount,
     categoryId: t.categoryId,
     date: t.date,
     note: typeof t.note === 'string' ? t.note : '',
     recurringId: typeof t.recurringId === 'string' ? t.recurringId : null,
+    installmentId: typeof t.installmentId === 'string' ? t.installmentId : null,
+    receiptImage: typeof t.receiptImage === 'string' && t.receiptImage.startsWith('data:image/') ? t.receiptImage : null,
     createdAt: typeof t.createdAt === 'string' ? t.createdAt : nowIso(),
   };
 }
@@ -155,6 +182,14 @@ export function normalize(input) {
     ? input.goals.map(normalizeGoal).filter(Boolean)
     : [];
 
+  const installments = Array.isArray(input.installments)
+    ? input.installments.map(normalizeInstallment).filter(Boolean)
+    : [];
+
+  const currencies = (input.currencies && typeof input.currencies === 'object')
+    ? { ...base.currencies, ...input.currencies }
+    : base.currencies;
+
   const budgets = {};
   if (input.budgets && typeof input.budgets === 'object') {
     for (const [categoryId, limit] of Object.entries(input.budgets)) {
@@ -178,6 +213,8 @@ export function normalize(input) {
     recurring,
     customCategories,
     goals,
+    installments,
+    currencies,
     budgets,
     materialized,
     createdAt: typeof input.createdAt === 'string' ? input.createdAt : base.createdAt,
@@ -364,6 +401,89 @@ export function contributeToGoal(state, id, delta) {
   if (!Number.isFinite(d)) return null;
   g.currentAmount = Math.max(0, g.currentAmount + d);
   return g;
+}
+
+// ---------- Taksitli Harcamalar (Installments) ----------
+
+export function addInstallment(state, input) {
+  const ins = normalizeInstallment({ ...input, id: `inst-${uid()}` });
+  if (!ins) return null;
+  if (!state.installments) state.installments = [];
+  state.installments.push(ins);
+  return ins;
+}
+
+export function removeInstallment(state, id) {
+  if (!state.installments) return false;
+  const idx = state.installments.findIndex((i) => i.id === id);
+  if (idx === -1) return false;
+  state.installments.splice(idx, 1);
+  return true;
+}
+
+export function updateInstallment(state, id, updates) {
+  if (!state.installments) return null;
+  const ins = state.installments.find((i) => i.id === id);
+  if (!ins) return null;
+  const merged = { ...ins, ...updates, id: ins.id };
+  const normalized = normalizeInstallment(merged);
+  if (!normalized) return null;
+  Object.assign(ins, normalized);
+  return ins;
+}
+
+/**
+ * Bir ay için tanımlı aktif taksitleri o aya işler.
+ */
+export function materializeInstallments(state, periodKeyStr) {
+  if (!state.installments || !Array.isArray(state.installments)) return 0;
+  const done = new Set(state.materialized[periodKeyStr] || []);
+  let added = 0;
+
+  for (const ins of state.installments) {
+    if (!ins.active || done.has(ins.id)) continue;
+
+    // Başlangıç ve bitiş ayları aralığını kontrol et
+    const [startY, startM] = ins.startPeriod.split('-').map(Number);
+    const [curY, curM] = periodKeyStr.split('-').map(Number);
+    const monthDiff = (curY - startY) * 12 + (curM - startM);
+
+    if (monthDiff >= 0 && monthDiff < ins.totalInstallments) {
+      const installmentNum = monthDiff + 1;
+      addTransaction(state, {
+        type: 'expense',
+        amount: ins.monthlyAmount,
+        categoryId: ins.categoryId,
+        date: `${periodKeyStr}-01`,
+        note: `${ins.name} (Taksit ${installmentNum}/${ins.totalInstallments})`,
+        installmentId: ins.id,
+      });
+      done.add(ins.id);
+      added += 1;
+    }
+  }
+
+  if (added > 0) state.materialized[periodKeyStr] = [...done];
+  return added;
+}
+
+// ---------- Para Birimi & Kur Yönetimi ----------
+
+export function setCurrencyRate(state, code, rate) {
+  const r = Number(rate);
+  if (!Number.isFinite(r) || r <= 0) return false;
+  if (!state.currencies) state.currencies = { USD: 33.5, EUR: 36.8, GBP: 43.0, GLD: 2600.0 };
+  state.currencies[code.toUpperCase()] = r;
+  return true;
+}
+
+export function convertToTRY(amount, currencyCode, state) {
+  const num = Number(amount);
+  if (!Number.isFinite(num)) return 0;
+  const code = (currencyCode || 'TRY').toUpperCase();
+  if (code === 'TRY') return num;
+  const rate = state.currencies?.[code] || 1;
+  return Number((num * rate).toFixed(2));
 }
 
 // ---------- PIN Kodu / Kilit ----------
