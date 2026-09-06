@@ -14,6 +14,9 @@ import {
   dailyExpenseHeatmap,
   installmentStats,
   simulateScenario,
+  cashFlowProjection,
+  computeInsights,
+  filterTransactionsByRange,
 } from '../src/compute.js';
 import { parseCsvToTransactions } from '../src/export.js';
 
@@ -243,4 +246,67 @@ describe('compute.js unit tests', () => {
     expect(future.remainingDebt).toBe(30000);
     expect(future.isActiveThisMonth).toBe(false);
   });
+
+  it('cashFlowProjection computes upcoming obligations and projected end balance', () => {
+    const s = normalize({});
+    addTransaction(s, { type: 'income', amount: 40000, categoryId: 'gelir-maas', date: '2026-09-01' });
+    addTransaction(s, { type: 'expense', amount: 10000, categoryId: 'gider-konut', date: '2026-09-02' });
+
+    // Recurring expense not yet materialized
+    s.recurring.push({
+      id: 'rec-fatura',
+      name: 'Elektrik',
+      type: 'expense',
+      amount: 1500,
+      categoryId: 'gider-fatura',
+      day: 20,
+      active: true,
+    });
+
+    // Installment
+    addInstallment(s, {
+      name: 'Telefon',
+      totalAmount: 24000,
+      totalInstallments: 12,
+      startPeriod: '2026-09',
+      categoryId: 'gider-diger',
+      dueDay: 25,
+    });
+
+    const refDate = new Date(2026, 8, 5); // 5 Eylül 2026
+    const proj = cashFlowProjection(s, '2026-09', refDate);
+
+    expect(proj.currentNet).toBe(30000);
+    expect(proj.pendingAmount).toBe(3500); // 1500 + 2000
+    expect(proj.projectedEndBalance).toBe(26500); // 30000 - 3500
+    expect(proj.upcomingPayments.length).toBe(2);
+  });
+
+  it('computeInsights provides relevant savings and budget warnings', () => {
+    const s = normalize({});
+    addTransaction(s, { type: 'income', amount: 50000, categoryId: 'gelir-maas', date: '2026-09-01' });
+    addTransaction(s, { type: 'expense', amount: 15000, categoryId: 'gider-konut', date: '2026-09-02' });
+
+    setBudget(s, 'gider-konut', 10000); // Exceeded!
+
+    const insights = computeInsights(s, '2026-09');
+    expect(insights.length).toBeGreaterThanOrEqual(1);
+    expect(insights.some((x) => x.id === 'savings-good')).toBe(true);
+    expect(insights.some((x) => x.id === 'budget-critical')).toBe(true);
+  });
+
+  it('filterTransactionsByRange accurately filters date intervals and calculates totals', () => {
+    const s = normalize({});
+    addTransaction(s, { type: 'expense', amount: 100, categoryId: 'gider-market', date: '2026-09-01' });
+    addTransaction(s, { type: 'expense', amount: 200, categoryId: 'gider-market', date: '2026-09-15' });
+    addTransaction(s, { type: 'income', amount: 5000, categoryId: 'gelir-maas', date: '2026-09-20' });
+    addTransaction(s, { type: 'expense', amount: 300, categoryId: 'gider-market', date: '2026-10-01' });
+
+    const res = filterTransactionsByRange(s, '2026-09-05', '2026-09-25');
+    expect(res.transactions.length).toBe(2);
+    expect(res.totals.income).toBe(5000);
+    expect(res.totals.expense).toBe(200);
+    expect(res.totals.net).toBe(4800);
+  });
 });
+

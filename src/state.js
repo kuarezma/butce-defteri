@@ -113,6 +113,7 @@ function normalizeInstallment(ins) {
     totalInstallments,
     startPeriod: typeof ins.startPeriod === 'string' && /^\d{4}-\d{2}$/.test(ins.startPeriod) ? ins.startPeriod : periodKey(),
     categoryId: typeof ins.categoryId === 'string' && ins.categoryId ? ins.categoryId : 'gider-diger',
+    dueDay: Number.isInteger(Number(ins.dueDay)) && Number(ins.dueDay) >= 1 && Number(ins.dueDay) <= 28 ? Number(ins.dueDay) : 1,
     note: typeof ins.note === 'string' ? ins.note : '',
     active: ins.active !== false,
   };
@@ -136,6 +137,7 @@ function normalizeTransaction(t) {
     note: typeof t.note === 'string' ? t.note : '',
     recurringId: typeof t.recurringId === 'string' ? t.recurringId : null,
     installmentId: typeof t.installmentId === 'string' ? t.installmentId : null,
+    hasReceipt: Boolean(t.hasReceipt || (typeof t.receiptImage === 'string' && t.receiptImage.startsWith('data:image/'))),
     receiptImage: typeof t.receiptImage === 'string' && t.receiptImage.startsWith('data:image/') ? t.receiptImage : null,
     createdAt: typeof t.createdAt === 'string' ? t.createdAt : nowIso(),
   };
@@ -149,6 +151,8 @@ function normalizeRecurring(r) {
   if (r.type !== 'income' && r.type !== 'expense') return null;
   if (typeof r.categoryId !== 'string' || !r.categoryId) return null;
   if (!Number.isInteger(day) || day < 1 || day > 28) return null; // 28: her ayda güvenli gün
+  const frequency = ['monthly', 'weekly', 'yearly'].includes(r.frequency) ? r.frequency : 'monthly';
+  const month = frequency === 'yearly' && Number.isInteger(Number(r.month)) && Number(r.month) >= 1 && Number(r.month) <= 12 ? Number(r.month) : (r.month || 1);
   return {
     id: typeof r.id === 'string' && r.id ? r.id : uid(),
     name: typeof r.name === 'string' && r.name ? r.name : 'Tekrarlayan işlem',
@@ -156,6 +160,8 @@ function normalizeRecurring(r) {
     amount,
     categoryId: r.categoryId,
     day,
+    frequency,
+    month: frequency === 'yearly' ? month : null,
     active: r.active !== false,
     note: typeof r.note === 'string' ? r.note : '',
   };
@@ -308,22 +314,63 @@ export function setRecurringActive(state, id, active) {
 export function materializeRecurring(state, periodKey) {
   const done = new Set(state.materialized[periodKey] || []);
   let added = 0;
+  const [y, m] = periodKey.split('-').map(Number);
+  const lastDay = new Date(y, m, 0).getDate();
+
   for (const r of state.recurring) {
-    if (!r.active || done.has(r.id)) continue;
-    const [y, m] = periodKey.split('-').map(Number);
-    const lastDay = new Date(y, m, 0).getDate(); // ayın gerçek gün sayısı
-    const day = Math.min(r.day, lastDay);
-    const date = `${periodKey}-${String(day).padStart(2, '0')}`;
-    addTransaction(state, {
-      type: r.type,
-      amount: r.amount,
-      categoryId: r.categoryId,
-      date,
-      note: r.note,
-      recurringId: r.id,
-    });
-    done.add(r.id);
-    added += 1;
+    if (!r.active) continue;
+    const freq = r.frequency || 'monthly';
+
+    if (freq === 'yearly') {
+      const targetMonth = r.month || 1;
+      if (m !== targetMonth || done.has(r.id)) continue;
+      const day = Math.min(r.day, lastDay);
+      const date = `${periodKey}-${String(day).padStart(2, '0')}`;
+      const noteLabel = `${r.name || ''}${r.note ? ' · ' + r.note : ''} (Yıllık)`.trim();
+      addTransaction(state, {
+        type: r.type,
+        amount: r.amount,
+        categoryId: r.categoryId,
+        date,
+        note: noteLabel,
+        recurringId: r.id,
+      });
+      done.add(r.id);
+      added += 1;
+    } else if (freq === 'weekly') {
+      const baseDay = Math.min(r.day || 1, 7);
+      for (let d = baseDay; d <= lastDay; d += 7) {
+        const date = `${periodKey}-${String(d).padStart(2, '0')}`;
+        const subId = `${r.id}_${date}`;
+        if (done.has(subId)) continue;
+        const noteLabel = `${r.name || ''}${r.note ? ' · ' + r.note : ''} (Haftalık)`.trim();
+        addTransaction(state, {
+          type: r.type,
+          amount: r.amount,
+          categoryId: r.categoryId,
+          date,
+          note: noteLabel,
+          recurringId: r.id,
+        });
+        done.add(subId);
+        added += 1;
+      }
+      done.add(r.id);
+    } else {
+      if (done.has(r.id)) continue;
+      const day = Math.min(r.day, lastDay);
+      const date = `${periodKey}-${String(day).padStart(2, '0')}`;
+      addTransaction(state, {
+        type: r.type,
+        amount: r.amount,
+        categoryId: r.categoryId,
+        date,
+        note: r.note || r.name || '',
+        recurringId: r.id,
+      });
+      done.add(r.id);
+      added += 1;
+    }
   }
   if (added > 0) state.materialized[periodKey] = [...done];
   return added;
@@ -450,11 +497,12 @@ export function materializeInstallments(state, periodKeyStr) {
 
     if (monthDiff >= 0 && monthDiff < ins.totalInstallments) {
       const installmentNum = monthDiff + 1;
+      const day = Math.min(ins.dueDay || 1, 28);
       addTransaction(state, {
         type: 'expense',
         amount: ins.monthlyAmount,
         categoryId: ins.categoryId,
-        date: `${periodKeyStr}-01`,
+        date: `${periodKeyStr}-${String(day).padStart(2, '0')}`,
         note: `${ins.name} (Taksit ${installmentNum}/${ins.totalInstallments})`,
         installmentId: ins.id,
       });
@@ -475,6 +523,21 @@ export function setCurrencyRate(state, code, rate) {
   if (!state.currencies) state.currencies = { USD: 33.5, EUR: 36.8, GBP: 43.0, GLD: 2600.0 };
   state.currencies[code.toUpperCase()] = r;
   return true;
+}
+
+export function setCurrencyRates(state, rates, updatedAt = nowIso()) {
+  if (!state.currencies) state.currencies = { USD: 33.5, EUR: 36.8, GBP: 43.0, GLD: 2600.0 };
+  if (rates && typeof rates === 'object') {
+    for (const [code, rate] of Object.entries(rates)) {
+      const r = Number(rate);
+      if (Number.isFinite(r) && r > 0) {
+        state.currencies[code.toUpperCase()] = Number(r.toFixed(2));
+      }
+    }
+    state.currencyLastUpdated = updatedAt;
+    return true;
+  }
+  return false;
 }
 
 export function convertToTRY(amount, currencyCode, state) {

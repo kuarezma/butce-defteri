@@ -129,7 +129,7 @@ export function renderTransactionList(container, badge, transactions, options = 
     const sign = t.type === 'income' ? '+' : '−';
     const hasCurrency = t.currency && t.currency !== 'TRY' && t.originalAmount;
     const currencyTag = hasCurrency ? `<span class="tx-curr-tag">${t.currency === 'USD' ? '$' : t.currency === 'EUR' ? '€' : t.currency === 'GBP' ? '£' : ''}${t.originalAmount} ${t.currency}</span>` : '';
-    const receiptBtn = t.receiptImage ? `<button type="button" class="tx-receipt-badge" data-preview-receipt="${esc(t.id)}" title="Fiş Fotoğrafını Gör">${getIcon('camera')} Fiş</button>` : '';
+    const receiptBtn = (t.receiptImage || t.hasReceipt) ? `<button type="button" class="tx-receipt-badge" data-preview-receipt="${esc(t.id)}" title="Fiş Fotoğrafını Gör">${getIcon('camera')} Fiş</button>` : '';
     const instTag = t.installmentId ? `<span class="tx-inst-badge">Taksit</span>` : '';
 
     return `
@@ -194,10 +194,10 @@ export function renderFiftyThirtyTwenty(host, analysis) {
 
 // ---------- Kategori grafiği ----------
 
-export function renderCategoryChart(host, rows, type) {
+export function renderCategoryChart(host, rows, type, onCategoryClick) {
   const hue = type === 'income' ? 'blue' : 'orange';
   const emptyText = type === 'income' ? 'Bu ay gelir kaydı yok.' : 'Bu ay gider kaydı yok.';
-  const chart = rankedBarChart(rows, { hue, emptyText });
+  const chart = rankedBarChart(rows, { hue, emptyText, onCategoryClick });
   host.innerHTML = chart.svg;
   chart.attach(host);
 }
@@ -550,5 +550,75 @@ export function renderCommandPalette(container, items, selectedIndex = 0) {
   `).join('');
 }
 
+// ---------- Akıllı İçgörüler (Smart Insights) ----------
+
+export function renderInsights(container, insights) {
+  if (!container) return;
+  if (!insights || insights.length === 0) {
+    container.innerHTML = '';
+    return;
+  }
+
+  container.innerHTML = `
+    <div class="insights-container">
+      ${insights.map((ins) => `
+        <div class="insight-card glass-card ${ins.type}">
+          <span class="insight-icon" aria-hidden="true">${ins.icon}</span>
+          <div class="insight-content">
+            <h4 class="insight-title">${esc(ins.title)}</h4>
+            <p class="insight-desc">${esc(ins.desc)}</p>
+          </div>
+        </div>
+      `).join('')}
+    </div>
+  `;
+}
+
+// ---------- Nakit Akışı ve Yaklaşan Ödemeler ----------
+
+export function renderCashFlow(container, cashFlowData) {
+  if (!container) return;
+  const { currentNet, pendingAmount, projectedEndBalance, daysRemaining, upcomingPayments } = cashFlowData;
+
+  const paymentsHtml = upcomingPayments.length === 0
+    ? '<p class="card-desc" style="margin-top: 10px;">Bu ay için bekleyen ödeme bulunmuyor.</p>'
+    : `
+      <ul class="cashflow-list">
+        ${upcomingPayments.map((p) => `
+          <li class="cashflow-item ${p.isPaid ? 'is-paid' : ''}">
+            <div class="cashflow-info">
+              <span class="cashflow-date">${p.day}. Gün (${esc(p.date.slice(5))})</span>
+              <strong class="cashflow-name">${esc(p.name)}</strong>
+            </div>
+            <div class="cashflow-amount-wrap">
+              <span class="cashflow-amount">${money(p.amount)}</span>
+              <span class="cashflow-status-badge ${p.isPaid ? 'paid' : 'pending'}">${p.isPaid ? 'Ödendi' : 'Bekliyor'}</span>
+            </div>
+          </li>
+        `).join('')}
+      </ul>
+    `;
+
+  container.innerHTML = `
+    <div class="cashflow-grid">
+      <div class="cashflow-metric-card glass-card">
+        <span class="metric-label">Ay Sonu Kalan Gün</span>
+        <strong class="metric-val">${daysRemaining} Gün</strong>
+        <span class="metric-sub">Kalan Yükümlülük: ${money(pendingAmount)}</span>
+      </div>
+      <div class="cashflow-metric-card glass-card">
+        <span class="metric-label">Tahmini Ay Sonu Kasa</span>
+        <strong class="metric-val ${projectedEndBalance >= 0 ? 'pos' : 'neg'}">${money(projectedEndBalance)}</strong>
+        <span class="metric-sub">Mevcut Net: ${money(currentNet)}</span>
+      </div>
+    </div>
+    <div class="cashflow-obligations">
+      <h4 style="margin: 16px 0 8px; font-size: 0.95rem; font-weight: 600;">Yaklaşan Ödemeler & Taksitler</h4>
+      ${paymentsHtml}
+    </div>
+  `;
+}
+
 export { CATEGORIES };
+
 

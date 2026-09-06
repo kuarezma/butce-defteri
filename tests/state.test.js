@@ -209,4 +209,57 @@ describe('state.js unit tests', () => {
     removePin();
     expect(hasPin()).toBe(false);
   });
+
+  it('handles weekly and yearly recurring properly in materializeRecurring', () => {
+    const s = normalize({});
+    // Yearly: only in September (month 9)
+    addRecurring(s, {
+      name: 'Araç Muayene',
+      type: 'expense',
+      amount: 2000,
+      categoryId: 'gider-ulasim',
+      day: 15,
+      frequency: 'yearly',
+      month: 9,
+    });
+
+    // Weekly: day 3
+    addRecurring(s, {
+      name: 'Haftalık Harçlık',
+      type: 'expense',
+      amount: 250,
+      categoryId: 'gider-eglence',
+      day: 3,
+      frequency: 'weekly',
+    });
+
+    // August 2026 (month 8): yearly should NOT trigger, weekly should trigger 4 times
+    materializeRecurring(s, '2026-08');
+    const augExpenses = s.transactions.filter((t) => t.date.startsWith('2026-08'));
+    expect(augExpenses.some((t) => t.note.includes('Araç Muayene'))).toBe(false);
+    const weeklyTxs = augExpenses.filter((t) => t.note.includes('Haftalık Harçlık'));
+    expect(weeklyTxs.length).toBeGreaterThanOrEqual(4);
+
+    // September 2026 (month 9): yearly should trigger!
+    materializeRecurring(s, '2026-09');
+    const sepExpenses = s.transactions.filter((t) => t.date.startsWith('2026-09'));
+    expect(sepExpenses.some((t) => t.note.includes('Araç Muayene'))).toBe(true);
+  });
+
+  it('materializeInstallments respects dueDay', () => {
+    const s = normalize({});
+    addInstallment(s, {
+      name: 'MacBook',
+      totalAmount: 48000,
+      totalInstallments: 12,
+      startPeriod: '2026-09',
+      categoryId: 'gider-diger',
+      dueDay: 20,
+    });
+
+    materializeInstallments(s, '2026-09');
+    expect(s.transactions.length).toBe(1);
+    expect(s.transactions[0].date).toBe('2026-09-20');
+  });
 });
+

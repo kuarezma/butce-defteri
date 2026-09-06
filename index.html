@@ -231,6 +231,9 @@
             </form>
           </section>
 
+          <!-- Akıllı İçgörüler Asistanı -->
+          <div id="insights-host"></div>
+
           <!-- Bu Ayın İşlemleri Listesi -->
           <section class="card glass-card" id="tx-list-card">
             <div class="card-head">
@@ -240,6 +243,16 @@
               </h2>
               <span class="badge" id="tx-count-badge">0 işlem</span>
             </div>
+
+            <!-- Özel Tarih Aralığı Filtresi -->
+            <div class="range-filter-bar" id="range-filter-bar">
+              <button type="button" class="range-chip is-active" data-range="month">Bu Ay</button>
+              <button type="button" class="range-chip" data-range="30days">Son 30 Gün</button>
+              <button type="button" class="range-chip" data-range="90days">Son 3 Ay</button>
+              <button type="button" class="range-chip" data-range="year">Bu Yıl</button>
+            </div>
+
+            <div id="category-filter-chip-host"></div>
 
             <div class="list-toolbar">
               <div class="search-box">
@@ -341,6 +354,18 @@
              SEKME 3: 🎯 PLANLAMA & BİRİKİM
              ============================================================ -->
         <div id="tab-planning" class="tab-pane" role="tabpanel" aria-labelledby="tab-btn-planning" hidden>
+          <!-- 📅 Nakit Akışı ve Yaklaşan Ödemeler -->
+          <section class="card glass-card" id="cashflow-card-section">
+            <div class="card-head">
+              <h2>
+                <span class="card-head-icon"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="18" height="18" x="3" y="4" rx="2" ry="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/></svg></span>
+                Nakit Akışı & Yaklaşan Ödemeler
+              </h2>
+            </div>
+            <p class="card-desc">Ay sonuna kadar bekleyen sabit giderler, taksitler ve tahmini kasa bakiyesi.</p>
+            <div id="cashflow-host"></div>
+          </section>
+
           <!-- 💳 Taksitli Harcamalar & Borç Planlayıcı -->
           <section class="card glass-card" id="installments-card-section">
             <div class="card-head">
@@ -397,7 +422,15 @@
                   <input type="number" name="amount" inputmode="decimal" step="0.01" min="0.01" placeholder="0.00" required />
                 </label>
                 <label class="field">
-                  <span>Ayın Günü</span>
+                  <span>Sıklık</span>
+                  <select name="frequency" id="rec-frequency">
+                    <option value="monthly" selected>Aylık</option>
+                    <option value="weekly">Haftalık</option>
+                    <option value="yearly">Yıllık</option>
+                  </select>
+                </label>
+                <label class="field">
+                  <span>Gün</span>
                   <input type="number" name="day" min="1" max="28" value="1" required />
                 </label>
               </div>
@@ -460,6 +493,14 @@
                 <div>
                   <strong class="tool-tile-title">PIN Kodu Kilidi</strong>
                   <p class="tool-tile-desc">Uygulama açılışını 4 haneli PIN ile koruyun.</p>
+                </div>
+              </button>
+
+              <button type="button" class="tool-tile" id="notifications-toggle-btn">
+                <span class="tool-tile-icon" id="notif-icon">🔔</span>
+                <div>
+                  <strong class="tool-tile-title">Fatura & Taksit Hatırlatıcı</strong>
+                  <p class="tool-tile-desc" id="notif-status-desc">Ödeme günleri yaklaşınca tarayıcı bildirimi alın.</p>
                 </div>
               </button>
             </div>
@@ -562,6 +603,10 @@
               <input type="month" name="startPeriod" id="inst-start-period" required />
             </label>
             <label class="field">
+              <span>Son Ödeme / Kesim Günü</span>
+              <input type="number" name="dueDay" id="inst-due-day" min="1" max="28" value="1" required />
+            </label>
+            <label class="field">
               <span>Kategori</span>
               <select name="categoryId" id="inst-category" required></select>
             </label>
@@ -651,7 +696,13 @@
           </button>
         </div>
         <form id="currency-form" class="tx-form">
-          <p class="card-desc">Farklı para birimlerinde girilen işlemlerin TL karşılığını hesaplamak için kullanılan kurlar:</p>
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+            <p class="card-desc" style="margin: 0;">Farklı para birimlerinin TL karşılıkları:</p>
+            <button type="button" class="btn btn-secondary btn-sm" id="fetch-live-rates-btn" style="white-space: nowrap; font-size: 0.8rem; padding: 4px 10px;">
+              ⚡ Canlı Çek
+            </button>
+          </div>
+          <p id="rate-last-updated-text" class="card-desc" style="font-size: 0.78rem; opacity: 0.8; margin-bottom: 12px;"></p>
           <div class="field-row">
             <label class="field">
               <span>USD ($) / TRY</span>
@@ -934,6 +985,12 @@
             <span>4 Haneli PIN</span>
             <input type="password" inputmode="numeric" pattern="[0-9]*" maxlength="4" id="pin-input" placeholder="••••" required />
           </label>
+          <label class="field" style="margin-top: 10px;">
+            <span style="display: flex; align-items: center; gap: 8px; font-weight: normal; cursor: pointer;">
+              <input type="checkbox" id="bio-setup-toggle" style="width: auto;" />
+              <span>Biyometrik Kilit (Face ID / Touch ID) Aktif</span>
+            </span>
+          </label>
 
           <div class="modal-actions">
             <button type="button" class="btn btn-danger" id="remove-pin-btn" hidden>Kilidi Kaldır</button>
@@ -949,10 +1006,14 @@
       <div class="lock-box glass-card">
         <span class="lock-icon"><svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></span>
         <h2>Bütçe Defteri Kilitli</h2>
-        <p>Devam etmek için 4 haneli PIN kodunu giriniz.</p>
+        <p>Devam etmek için 4 haneli PIN kodunu giriniz veya biyometriği kullanınız.</p>
         <form id="pin-unlock-form">
           <input type="password" inputmode="numeric" pattern="[0-9]*" maxlength="4" id="pin-unlock-input" placeholder="••••" autofocus autocomplete="off" />
           <button type="submit" class="btn btn-primary btn-block">Kilidi Aç</button>
+          <button type="button" id="bio-quick-unlock-btn" class="btn btn-secondary btn-block" style="margin-top: 10px; display: none;">
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align: middle; margin-right: 6px;"><circle cx="12" cy="12" r="10"/><path d="M12 6a6 6 0 0 0-6 6c0 2 1.2 3.8 3 4.7"/><path d="M12 10a2 2 0 1 0 2 2"/></svg>
+            Touch ID / Face ID ile Aç
+          </button>
           <p id="pin-error-msg" class="pin-error" hidden>Hatalı PIN, lütfen tekrar deneyin.</p>
         </form>
       </div>

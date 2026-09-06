@@ -2608,4 +2608,233 @@ dialog.wide-modal {
   }
 }
 
+/* ---------- Akıllı Finansal İçgörüler (Smart Insights) ---------- */
+.insights-container {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.insight-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.insight-card.success {
+  border-left: 4px solid #10b981;
+  background: rgba(16, 185, 129, 0.05);
+}
+
+.insight-card.warning {
+  border-left: 4px solid #f59e0b;
+  background: rgba(245, 158, 11, 0.05);
+}
+
+.insight-card.critical {
+  border-left: 4px solid #ef4444;
+  background: rgba(239, 68, 68, 0.05);
+}
+
+.insight-card.info {
+  border-left: 4px solid #3b82f6;
+  background: rgba(59, 130, 246, 0.05);
+}
+
+.insight-icon {
+  font-size: 1.3rem;
+  line-height: 1;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.insight-content {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.insight-title {
+  font-size: 0.88rem;
+  font-weight: 600;
+  margin: 0;
+}
+
+.insight-desc {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  margin: 0;
+  line-height: 1.4;
+}
+
+/* ---------- Nakit Akışı & Yaklaşan Ödemeler ---------- */
+.cashflow-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-top: 10px;
+}
+
+.cashflow-metric-card {
+  padding: 14px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.cashflow-metric-card .metric-label {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+
+.cashflow-metric-card .metric-val {
+  font-size: 1.25rem;
+  font-weight: 700;
+}
+
+.cashflow-metric-card .metric-val.pos { color: #10b981; }
+.cashflow-metric-card .metric-val.neg { color: #ef4444; }
+
+.cashflow-metric-card .metric-sub {
+  font-size: 0.75rem;
+  opacity: 0.75;
+}
+
+.cashflow-list {
+  list-style: none;
+  padding: 0;
+  margin: 10px 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.cashflow-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--border);
+}
+
+.cashflow-item.is-paid {
+  opacity: 0.55;
+}
+
+.cashflow-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.cashflow-date {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.cashflow-name {
+  font-size: 0.88rem;
+}
+
+.cashflow-amount-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.cashflow-amount {
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+.cashflow-status-badge {
+  font-size: 0.72rem;
+  padding: 2px 7px;
+  border-radius: 9999px;
+  font-weight: 500;
+}
+
+.cashflow-status-badge.paid {
+  background: rgba(16, 185, 129, 0.15);
+  color: #10b981;
+}
+
+.cashflow-status-badge.pending {
+  background: rgba(245, 158, 11, 0.15);
+  color: #f59e0b;
+}
+
+/* ---------- Kategori Filtre Çipi (Drill-Down) ---------- */
+.category-filter-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 12px;
+  background: rgba(59, 130, 246, 0.15);
+  border: 1px solid rgba(59, 130, 246, 0.3);
+  color: #93c5fd;
+  border-radius: 9999px;
+  font-size: 0.82rem;
+  margin-bottom: 12px;
+}
+
+.category-filter-chip button {
+  background: none;
+  border: none;
+  color: inherit;
+  cursor: pointer;
+  padding: 0;
+  font-size: 1rem;
+  line-height: 1;
+}
+
+/* ---------- Özel Tarih Aralığı Filtre Çubuğu ---------- */
+.range-filter-bar {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  padding: 2px 0 10px;
+  margin-bottom: 8px;
+  scrollbar-width: none;
+}
+
+.range-filter-bar::-webkit-scrollbar {
+  display: none;
+}
+
+.range-chip {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  padding: 5px 12px;
+  border-radius: 9999px;
+  font-size: 0.8rem;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s ease;
+}
+
+.range-chip:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text);
+}
+
+.range-chip.is-active {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: #ffffff;
+  font-weight: 600;
+}
+
+
 

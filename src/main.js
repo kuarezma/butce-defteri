@@ -3,7 +3,7 @@ import {
   load, save, normalize, serialize,
   addTransaction, removeTransaction, updateTransaction, transactionsInMonth,
   addRecurring, removeRecurring, updateRecurring, setRecurringActive, materializeRecurring,
-  addInstallment, removeInstallment, materializeInstallments, setCurrencyRate, convertToTRY,
+  addInstallment, removeInstallment, materializeInstallments, setCurrencyRate, setCurrencyRates, convertToTRY,
   setBudget, addCustomCategory, removeCustomCategory,
   addGoal, removeGoal, updateGoal, contributeToGoal,
   hasPin, setPin, verifyPin, removePin,
@@ -12,7 +12,7 @@ import {
 import {
   monthTotals, categoryBreakdown, trendSeries, budgetStatus, trailingAverageExpense, savingsRate,
   computeFiftyThirtyTwenty, parseQuickEntry, annualSummary, dailyExpenseHeatmap,
-  installmentStats, simulateScenario,
+  installmentStats, simulateScenario, cashFlowProjection, computeInsights, filterTransactionsByRange,
 } from './compute.js';
 import {
   fillCategorySelect, fillBudgetCategorySelect,
@@ -20,10 +20,16 @@ import {
   renderBudgetList, renderRecurringList, renderFiftyThirtyTwenty, renderCustomCategoryList,
   renderGoalsList, renderCalendarHeatmap, renderAnnualReport,
   renderInstallmentList, renderSimulator, renderCommandPalette,
+  renderInsights, renderCashFlow,
   monthLabel, setPrivacyMode, isPrivacyMode,
 } from './render.js';
 import { transactionsToCsv, downloadCsv, parseCsvToTransactions } from './export.js';
 import { getIcon } from './icons.js';
+import { openReceiptDb, saveReceiptImage, getReceiptImage, deleteReceiptImage, migrateReceiptsToIndexedDb } from './idb.js';
+import { isBiometricSupported, isBiometricEnabled, setBiometricEnabled, registerBiometric, authenticateBiometric } from './biometrics.js';
+import { fetchLiveRates } from './currency.js';
+import { isNotificationSupported, getNotificationPermission, requestNotificationPermission, checkUpcomingReminders } from './notifications.js';
+import { categoryById } from './data/categories.js';
 
 const state = load();
 let currentPeriod = periodKey();
@@ -31,6 +37,8 @@ let currentAnnualYear = parseInt(currentPeriod.slice(0, 4), 10);
 let categoryChartType = 'expense';
 let txSearchQuery = '';
 let txTypeFilter = 'all';
+let activeCategoryFilter = null;
+let currentDateRange = 'month'; // 'month' | '30days' | '90days' | 'year'
 let pendingReceiptData = null;
 
 // Ay açılınca o aya tanımlı tekrarlayanları ve taksitleri işle (idempotent).
@@ -38,6 +46,34 @@ let initialMaterialized = false;
 if (materializeRecurring(state, currentPeriod) > 0) initialMaterialized = true;
 if (materializeInstallments(state, currentPeriod) > 0) initialMaterialized = true;
 if (initialMaterialized) save(state);
+
+// IndexedDB migrasyonu: Fiş görsellerini localStorage'dan IndexedDB'ye taşı
+migrateReceiptsToIndexedDb(state).then((count) => {
+  if (count > 0) save(state);
+});
+
+// Yaklaşan ödeme bildirimlerini kontrol et
+checkUpcomingReminders(state, currentPeriod);
+
+// Web Share Target yakalama
+const urlParams = new URLSearchParams(window.location.search);
+const sharedText = urlParams.get('share_text') || urlParams.get('share_title') || urlParams.get('text') || urlParams.get('title');
+if (sharedText) {
+  const parsed = parseQuickEntry(sharedText, state.customCategories, state);
+  if (parsed) {
+    addTransaction(state, {
+      type: parsed.type,
+      amount: parsed.amount,
+      originalAmount: parsed.originalAmount,
+      currency: parsed.currency,
+      categoryId: parsed.categoryId,
+      date: getDefaultDateForPeriod(currentPeriod),
+      note: parsed.note,
+    });
+    save(state);
+  }
+  window.history.replaceState(null, '', window.location.pathname);
+}
 
 // ---------- Tema ve Gizlilik Modu Başlatma ----------
 
@@ -305,11 +341,38 @@ document.querySelectorAll('dialog').forEach((dialog) => {
   });
 });
 
-// ---------- PIN Kilit Kontrolü ----------
+// ---------- PIN ve Biyometrik Kilit Kontrolü ----------
 
 if (hasPin()) {
   els.pinLockOverlay.hidden = false;
   setTimeout(() => els.pinUnlockInput.focus(), 100);
+
+  const bioQuickUnlockBtn = document.getElementById('bio-quick-unlock-btn');
+  if (isBiometricEnabled() && bioQuickUnlockBtn) {
+    bioQuickUnlockBtn.style.display = 'inline-flex';
+    // Biyometrik doğrulamayı otomatik dene
+    authenticateBiometric().then((ok) => {
+      if (ok) {
+        els.pinLockOverlay.hidden = true;
+        els.pinUnlockInput.value = '';
+        els.pinErrorMsg.hidden = true;
+      }
+    });
+  }
+}
+
+const bioQuickUnlockBtn = document.getElementById('bio-quick-unlock-btn');
+if (bioQuickUnlockBtn) {
+  bioQuickUnlockBtn.addEventListener('click', async () => {
+    const ok = await authenticateBiometric();
+    if (ok) {
+      els.pinLockOverlay.hidden = true;
+      els.pinUnlockInput.value = '';
+      els.pinErrorMsg.hidden = true;
+    } else {
+      status('Biyometrik doğrulama başarısız. Lütfen PIN girin.', 'error');
+    }
+  });
 }
 
 if (els.pinUnlockForm) {
@@ -478,14 +541,69 @@ function paint() {
   const sRate = savingsRate(totals);
   renderStats(els, totals, avg, sRate);
 
-  renderTransactionList(els.txList, els.txCountBadge, transactionsInMonth(state, currentPeriod), {
+  // Akıllı İçgörüler
+  const insightsHost = document.getElementById('insights-host');
+  if (insightsHost) {
+    renderInsights(insightsHost, computeInsights(state, currentPeriod));
+  }
+
+  // Tarih aralığına göre işlemleri çek
+  let txs = [];
+  if (currentDateRange === '30days') {
+    const today = new Date();
+    const past = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000);
+    const start = past.toISOString().slice(0, 10);
+    const end = today.toISOString().slice(0, 10);
+    txs = filterTransactionsByRange(state, start, end).transactions;
+  } else if (currentDateRange === '90days') {
+    const today = new Date();
+    const past = new Date(today.getTime() - 90 * 24 * 60 * 60 * 1000);
+    const start = past.toISOString().slice(0, 10);
+    const end = today.toISOString().slice(0, 10);
+    txs = filterTransactionsByRange(state, start, end).transactions;
+  } else if (currentDateRange === 'year') {
+    const y = currentPeriod.slice(0, 4);
+    txs = filterTransactionsByRange(state, `${y}-01-01`, `${y}-12-31`).transactions;
+  } else {
+    txs = transactionsInMonth(state, currentPeriod);
+  }
+
+  // Kategori Drill-down filtresi
+  if (activeCategoryFilter) {
+    txs = txs.filter((t) => t.categoryId === activeCategoryFilter);
+  }
+
+  const chipHost = document.getElementById('category-filter-chip-host');
+  if (chipHost) {
+    if (activeCategoryFilter) {
+      const catObj = categoryById(activeCategoryFilter, state.customCategories) || { name: 'Kategori', icon: '🏷️' };
+      chipHost.innerHTML = `
+        <div class="category-filter-chip">
+          <span>${catObj.icon} ${catObj.name} filtresi aktif</span>
+          <button type="button" id="clear-cat-filter-btn" title="Filtreyi Temizle" aria-label="Filtreyi Temizle">✕</button>
+        </div>
+      `;
+      document.getElementById('clear-cat-filter-btn')?.addEventListener('click', () => {
+        activeCategoryFilter = null;
+        paint();
+      });
+    } else {
+      chipHost.innerHTML = '';
+    }
+  }
+
+  renderTransactionList(els.txList, els.txCountBadge, txs, {
     search: txSearchQuery,
     filter: txTypeFilter,
     customCategories: state.customCategories,
   });
 
   const rows = categoryBreakdown(state, currentPeriod, categoryChartType);
-  renderCategoryChart(els.categoryChartHost, rows, categoryChartType);
+  renderCategoryChart(els.categoryChartHost, rows, categoryChartType, (catId) => {
+    activeCategoryFilter = (activeCategoryFilter === catId) ? null : catId;
+    switchTab('tab-overview');
+    paint();
+  });
 
   renderTrendChart(els.trendChartHost, trendSeries(state, currentPeriod, 6));
 
@@ -494,6 +612,12 @@ function paint() {
 
   const heatmapData = dailyExpenseHeatmap(state, currentPeriod);
   renderCalendarHeatmap(els.heatmapHost, heatmapData);
+
+  // Nakit Akışı & Yaklaşan Ödemeler
+  const cashflowHost = document.getElementById('cashflow-host');
+  if (cashflowHost) {
+    renderCashFlow(cashflowHost, cashFlowProjection(state, currentPeriod));
+  }
 
   const instData = installmentStats(state, currentPeriod);
   renderInstallmentList(els.installmentsList, instData);
@@ -541,14 +665,23 @@ if (els.heatmapHost) {
 // ---------- Fiş Önizleme Tıklaması ----------
 
 if (els.txList) {
-  els.txList.addEventListener('click', (e) => {
+  els.txList.addEventListener('click', async (e) => {
     const receiptBtn = e.target.closest('[data-preview-receipt]');
     if (!receiptBtn) return;
     const txId = receiptBtn.dataset.previewReceipt;
     const t = state.transactions.find((tx) => tx.id === txId);
-    if (!t || !t.receiptImage) return;
+    if (!t) return;
 
-    els.receiptPreviewImg.src = t.receiptImage;
+    let imgData = t.receiptImage;
+    if (!imgData) {
+      imgData = await getReceiptImage(txId);
+    }
+    if (!imgData) {
+      status('Fiş görseli bulunamadı.', 'error');
+      return;
+    }
+
+    els.receiptPreviewImg.src = imgData;
     if (els.receiptDialog.showModal) els.receiptDialog.showModal();
     else els.receiptDialog.setAttribute('open', '');
   });
@@ -641,12 +774,14 @@ if (els.installmentForm) {
   els.installmentForm.addEventListener('submit', (e) => {
     e.preventDefault();
     const form = new FormData(els.installmentForm);
+    const dueDay = Number(form.get('dueDay')) || 1;
     const ins = addInstallment(state, {
       name: form.get('name'),
       totalAmount: form.get('totalAmount'),
       totalInstallments: form.get('totalInstallments'),
       startPeriod: form.get('startPeriod') || currentPeriod,
       categoryId: form.get('categoryId'),
+      dueDay,
     });
 
     if (!ins) {
@@ -819,6 +954,41 @@ if (els.paletteList) {
 
 // ---------- Döviz & Kur Ayarları Modalı ----------
 
+const fetchLiveRatesBtn = document.getElementById('fetch-live-rates-btn');
+const rateLastUpdatedText = document.getElementById('rate-last-updated-text');
+
+function updateRateTimestampText() {
+  if (!rateLastUpdatedText) return;
+  if (state.currencyLastUpdated) {
+    const d = new Date(state.currencyLastUpdated);
+    rateLastUpdatedText.textContent = `Son güncelleme: ${d.toLocaleDateString('tr-TR')} ${d.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}`;
+  } else {
+    rateLastUpdatedText.textContent = 'Henüz canlı kur çekilmedi.';
+  }
+}
+
+if (fetchLiveRatesBtn) {
+  fetchLiveRatesBtn.addEventListener('click', async () => {
+    fetchLiveRatesBtn.disabled = true;
+    fetchLiveRatesBtn.textContent = '⏳ Çekiliyor...';
+    const res = await fetchLiveRates();
+    fetchLiveRatesBtn.disabled = false;
+    fetchLiveRatesBtn.textContent = '⚡ Canlı Çek';
+    if (res.success) {
+      setCurrencyRates(state, res.rates, res.time);
+      persist();
+      paint();
+      if (els.rateUsd) els.rateUsd.value = state.currencies.USD;
+      if (els.rateEur) els.rateEur.value = state.currencies.EUR;
+      if (els.rateGbp) els.rateGbp.value = state.currencies.GBP;
+      updateRateTimestampText();
+      status(`Canlı kurlar güncellendi: USD: ₺${state.currencies.USD}, EUR: ₺${state.currencies.EUR}, GBP: ₺${state.currencies.GBP}`);
+    } else {
+      status(`Kurlar alınamadı: ${res.error}`, 'error');
+    }
+  });
+}
+
 if (els.currencyBtn) {
   els.currencyBtn.addEventListener('click', () => {
     const c = state.currencies || { USD: 33.5, EUR: 36.8, GBP: 43.0, GLD: 2600.0 };
@@ -826,6 +996,7 @@ if (els.currencyBtn) {
     els.rateEur.value = c.EUR;
     els.rateGbp.value = c.GBP;
     els.rateGld.value = c.GLD;
+    updateRateTimestampText();
     if (els.currencyDialog.showModal) els.currencyDialog.showModal();
     else els.currencyDialog.setAttribute('open', '');
   });
@@ -847,7 +1018,9 @@ if (els.currencyForm) {
   });
 }
 
-// ---------- PIN Dialog ----------
+// ---------- PIN ve Biyometri Dialog ----------
+
+const bioSetupToggle = document.getElementById('bio-setup-toggle');
 
 if (els.pinToggleBtn) {
   els.pinToggleBtn.addEventListener('click', () => {
@@ -858,6 +1031,15 @@ if (els.pinToggleBtn) {
     els.removePinBtn.hidden = !active;
     els.savePinBtn.textContent = active ? 'PIN Güncelle' : 'PIN Kaydet';
     els.pinInput.value = '';
+
+    isBiometricSupported().then((supported) => {
+      const field = bioSetupToggle?.closest('label');
+      if (field) {
+        field.style.display = supported ? 'block' : 'none';
+        if (bioSetupToggle) bioSetupToggle.checked = isBiometricEnabled();
+      }
+    });
+
     if (els.pinDialog.showModal) els.pinDialog.showModal();
     else els.pinDialog.setAttribute('open', '');
   });
@@ -867,7 +1049,7 @@ if (els.closePinDialog) els.closePinDialog.addEventListener('click', () => els.p
 if (els.cancelPinBtn) els.cancelPinBtn.addEventListener('click', () => els.pinDialog.close());
 
 if (els.pinForm) {
-  els.pinForm.addEventListener('submit', (e) => {
+  els.pinForm.addEventListener('submit', async (e) => {
     e.preventDefault();
     const pin = els.pinInput.value.trim();
     if (pin.length !== 4 || !/^\d{4}$/.test(pin)) {
@@ -875,18 +1057,57 @@ if (els.pinForm) {
       return;
     }
     setPin(pin);
+    if (bioSetupToggle && bioSetupToggle.checked && !isBiometricEnabled()) {
+      await registerBiometric();
+    } else if (bioSetupToggle && !bioSetupToggle.checked && isBiometricEnabled()) {
+      setBiometricEnabled(false);
+    }
     updatePinIcon();
     els.pinDialog.close();
-    status('PIN kilidi başarıyla etkinleştirildi.');
+    status('PIN kilidi başarıyla güncellendi.');
   });
 }
 
 if (els.removePinBtn) {
   els.removePinBtn.addEventListener('click', () => {
     removePin();
+    setBiometricEnabled(false);
     updatePinIcon();
     els.pinDialog.close();
     status('PIN kilidi kaldırıldı.');
+  });
+}
+
+// ---------- Fatura & Taksit Hatırlatıcı Bildirimler ----------
+
+const notifBtn = document.getElementById('notifications-toggle-btn');
+const notifDesc = document.getElementById('notif-status-desc');
+
+function updateNotifStatus() {
+  if (!notifDesc) return;
+  const perm = getNotificationPermission();
+  if (perm === 'granted') {
+    notifDesc.textContent = '✓ Hatırlatıcılar aktif. Yaklaşan ödemelerde bildirim alacaksınız.';
+  } else if (perm === 'denied') {
+    notifDesc.textContent = '✕ Bildirimler engellendi. Tarayıcı ayarlarından izin verebilirsiniz.';
+  } else if (perm === 'unsupported') {
+    notifDesc.textContent = 'Bu cihaz/tarayıcı bildirimleri desteklemiyor.';
+  } else {
+    notifDesc.textContent = 'Ödeme günleri yaklaşınca tarayıcı bildirimi alın.';
+  }
+}
+
+if (notifBtn) {
+  updateNotifStatus();
+  notifBtn.addEventListener('click', async () => {
+    const granted = await requestNotificationPermission();
+    updateNotifStatus();
+    if (granted) {
+      status('Bildirim izni verildi! Yaklaşan ödemeler hatırlatılacak.');
+      checkUpcomingReminders(state, currentPeriod);
+    } else {
+      status('Bildirim izni alınamadı veya reddedildi.', 'error');
+    }
   });
 }
 
@@ -940,11 +1161,7 @@ els.nextMonth.addEventListener('click', () => {
 if (els.txSearchInput) {
   els.txSearchInput.addEventListener('input', (event) => {
     txSearchQuery = event.target.value;
-    renderTransactionList(els.txList, els.txCountBadge, transactionsInMonth(state, currentPeriod), {
-      search: txSearchQuery,
-      filter: txTypeFilter,
-      customCategories: state.customCategories,
-    });
+    paint();
   });
 }
 
@@ -957,11 +1174,20 @@ if (els.txFilterGroup) {
       b.setAttribute('aria-checked', String(b === btn));
     });
     txTypeFilter = btn.dataset.filter;
-    renderTransactionList(els.txList, els.txCountBadge, transactionsInMonth(state, currentPeriod), {
-      search: txSearchQuery,
-      filter: txTypeFilter,
-      customCategories: state.customCategories,
-    });
+    paint();
+  });
+}
+
+// Tarih Aralığı Filtre Barı
+const rangeFilterBar = document.getElementById('range-filter-bar');
+if (rangeFilterBar) {
+  rangeFilterBar.addEventListener('click', (e) => {
+    const chip = e.target.closest('.range-chip');
+    if (!chip) return;
+    rangeFilterBar.querySelectorAll('.range-chip').forEach((c) => c.classList.remove('is-active'));
+    chip.classList.add('is-active');
+    currentDateRange = chip.dataset.range || 'month';
+    paint();
   });
 }
 
@@ -971,7 +1197,7 @@ wireSegmented(els.txForm.querySelector('.segmented'), els.txType, (type) => {
   fillCategorySelect(els.txCategory, type, state.customCategories);
 });
 
-els.txForm.addEventListener('submit', (event) => {
+els.txForm.addEventListener('submit', async (event) => {
   event.preventDefault();
   const form = new FormData(els.txForm);
   const rawAmt = Number(form.get('amount'));
@@ -986,12 +1212,16 @@ els.txForm.addEventListener('submit', (event) => {
     categoryId: form.get('categoryId'),
     date: form.get('date'),
     note: form.get('note'),
-    receiptImage: pendingReceiptData,
+    hasReceipt: Boolean(pendingReceiptData),
   });
 
   if (!t) {
     status('İşlem eklenemedi — tutarı ve tarihi kontrol et.', 'error');
     return;
+  }
+
+  if (pendingReceiptData) {
+    await saveReceiptImage(t.id, pendingReceiptData);
   }
 
   persist();
@@ -1014,7 +1244,9 @@ els.txList.addEventListener('click', (event) => {
   const editBtn = event.target.closest('[data-edit-tx]');
 
   if (deleteBtn) {
-    removeTransaction(state, deleteBtn.dataset.deleteTx);
+    const txId = deleteBtn.dataset.deleteTx;
+    removeTransaction(state, txId);
+    deleteReceiptImage(txId);
     persist();
     paint();
     status('İşlem silindi.');
@@ -1212,6 +1444,7 @@ els.recurringForm.addEventListener('submit', (event) => {
     amount: form.get('amount'),
     categoryId: form.get('categoryId'),
     day: form.get('day'),
+    frequency: form.get('frequency') || 'monthly',
   });
   if (!r) {
     status('Tekrarlayan işlem eklenemedi — alanları kontrol et.', 'error');

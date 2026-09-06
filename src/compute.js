@@ -470,3 +470,197 @@ export function dailyExpenseHeatmap(state, period) {
     firstDayOfWeek: (new Date(y, m - 1, 1).getDay() + 6) % 7,
   };
 }
+
+/**
+ * Nakit Akışı ve Yaklaşan Ödemeler Projeksiyonu
+ */
+export function cashFlowProjection(state, periodKeyStr, referenceDate = new Date()) {
+  const [y, m] = periodKeyStr.split('-').map(Number);
+  const lastDay = new Date(y, m, 0).getDate();
+  const totals = monthTotals(state, periodKeyStr);
+
+  const refYear = referenceDate.getFullYear();
+  const refMonth = referenceDate.getMonth() + 1;
+  const isCurrentMonth = (y === refYear && m === refMonth);
+  const todayDay = isCurrentMonth ? referenceDate.getDate() : (y < refYear || (y === refYear && m < refMonth) ? lastDay : 1);
+
+  const materializedSet = new Set(state.materialized?.[periodKeyStr] || []);
+  const upcomingPayments = [];
+
+  // 1. Henüz bu aya işlenmemiş veya günü bugünden sonra olan tekrarlayan giderler
+  for (const r of (state.recurring || [])) {
+    if (!r.active || r.type !== 'expense') continue;
+    const isDone = materializedSet.has(r.id);
+    const day = Math.min(r.day || 1, lastDay);
+    const date = `${periodKeyStr}-${String(day).padStart(2, '0')}`;
+
+    if (!isDone || (isCurrentMonth && day >= todayDay)) {
+      upcomingPayments.push({
+        id: `rec-${r.id}`,
+        name: r.name,
+        amount: r.amount,
+        categoryId: r.categoryId,
+        day,
+        date,
+        type: 'recurring',
+        isPaid: isDone,
+      });
+    }
+  }
+
+  // 2. Aktif taksitler
+  for (const ins of (state.installments || [])) {
+    if (!ins.active) continue;
+    const [startY, startM] = ins.startPeriod.split('-').map(Number);
+    const monthDiff = (y - startY) * 12 + (m - startM);
+    if (monthDiff >= 0 && monthDiff < ins.totalInstallments) {
+      const isDone = materializedSet.has(ins.id);
+      const day = Math.min(ins.dueDay || 1, lastDay);
+      const date = `${periodKeyStr}-${String(day).padStart(2, '0')}`;
+      if (!isDone || (isCurrentMonth && day >= todayDay)) {
+        upcomingPayments.push({
+          id: `inst-${ins.id}`,
+          name: `${ins.name} (${monthDiff + 1}/${ins.totalInstallments})`,
+          amount: ins.monthlyAmount,
+          categoryId: ins.categoryId,
+          day,
+          date,
+          type: 'installment',
+          isPaid: isDone,
+        });
+      }
+    }
+  }
+
+  // Sırala: Güne göre küçükten büyüğe
+  upcomingPayments.sort((a, b) => a.day - b.day);
+
+  // Kalan ödenmemiş toplam
+  const pendingAmount = upcomingPayments
+    .filter((p) => !p.isPaid)
+    .reduce((sum, p) => sum + p.amount, 0);
+
+  const projectedEndBalance = totals.net - pendingAmount;
+  const daysRemaining = Math.max(0, lastDay - todayDay);
+
+  return {
+    period: periodKeyStr,
+    currentNet: totals.net,
+    pendingAmount: Number(pendingAmount.toFixed(2)),
+    projectedEndBalance: Number(projectedEndBalance.toFixed(2)),
+    daysRemaining,
+    upcomingPayments,
+  };
+}
+
+/**
+ * Akıllı Bütçe Asistanı & Finansal İçgörüler (Smart Insights)
+ */
+export function computeInsights(state, periodKeyStr) {
+  const insights = [];
+  const totals = monthTotals(state, periodKeyStr);
+  const sRate = savingsRate(totals);
+
+  // 1. Tasarruf Değerlendirmesi
+  if (totals.income > 0) {
+    if (sRate >= 20) {
+      insights.push({
+        id: 'savings-good',
+        type: 'success',
+        icon: '🎯',
+        title: 'Harika Tasarruf Oranı',
+        desc: `Bu ay gelirinizin %${sRate}'sini biriktirdiniz. 50/30/20 ideal tasarruf hedefinin (%20) üzerindesiniz!`,
+      });
+    } else if (sRate < 0) {
+      insights.push({
+        id: 'savings-neg',
+        type: 'warning',
+        icon: '⚠️',
+        title: 'Bütçe Açığı Uyarısı',
+        desc: `Bu ay giderleriniz gelirinizi ₺${Math.abs(totals.net).toLocaleString('tr-TR')} aştı.`,
+      });
+    }
+  }
+
+  // 2. Bütçe Limiti Uyarısı
+  const bStatus = budgetStatus(state, periodKeyStr);
+  const criticalBudgets = bStatus.filter((b) => b.severity === 'critical');
+  const warningBudgets = bStatus.filter((b) => b.severity === 'warning');
+
+  if (criticalBudgets.length > 0) {
+    const names = criticalBudgets.map((b) => b.name).join(', ');
+    insights.push({
+      id: 'budget-critical',
+      type: 'critical',
+      icon: '🚨',
+      title: 'Bütçe Aşımı',
+      desc: `${names} kategorisinde belirlenen bütçe limiti aşıldı!`,
+    });
+  } else if (warningBudgets.length > 0) {
+    const names = warningBudgets.map((b) => b.name).join(', ');
+    insights.push({
+      id: 'budget-warn',
+      type: 'warning',
+      icon: '⚡',
+      title: 'Bütçe Sınırına Yaklaşıldı',
+      desc: `${names} kategorisinde harcamalarınız bütçenizin %70'ini geçti.`,
+    });
+  }
+
+  // 3. Geçen Aya Göre Kategori Değişimi
+  const comp = categoryComparison(state, periodKeyStr, 'expense');
+  const highIncrease = comp.find((c) => c.diffPercent >= 30 && c.diff >= 500);
+  if (highIncrease) {
+    insights.push({
+      id: 'cat-surge',
+      type: 'info',
+      icon: '📈',
+      title: 'Harcama Artışı',
+      desc: `${highIncrease.name} harcamanız geçen aya göre %${highIncrease.diffPercent} (+₺${highIncrease.diff.toLocaleString('tr-TR')}) yükseldi.`,
+    });
+  }
+
+  // 4. Genel Pozitif Durum
+  if (insights.length === 0) {
+    insights.push({
+      id: 'all-clear',
+      type: 'info',
+      icon: '💡',
+      title: 'Dengeli Bütçe',
+      desc: 'Harcamalarınız bütçe sınırları ve dengeli nakit akışı içerisinde devam ediyor.',
+    });
+  }
+
+  return insights;
+}
+
+/**
+ * Özel Tarih Aralığı Filtresi
+ */
+export function filterTransactionsByRange(state, startDate, endDate) {
+  if (!state || !Array.isArray(state.transactions)) {
+    return { transactions: [], totals: { income: 0, expense: 0, net: 0, count: 0 } };
+  }
+  const filtered = state.transactions.filter((t) => {
+    if (!t.date) return false;
+    return t.date >= startDate && t.date <= endDate;
+  });
+
+  let income = 0;
+  let expense = 0;
+  for (const t of filtered) {
+    if (t.type === 'income') income += t.amount;
+    else if (t.type === 'expense') expense += t.amount;
+  }
+
+  return {
+    transactions: filtered,
+    totals: {
+      income: Number(income.toFixed(2)),
+      expense: Number(expense.toFixed(2)),
+      net: Number((income - expense).toFixed(2)),
+      count: filtered.length,
+    },
+  };
+}
+

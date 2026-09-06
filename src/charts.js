@@ -67,7 +67,7 @@ function hideTooltip() {
 
 // ---------- Sıralı yatay çubuk grafik (kategori kırılımı) ----------
 
-export function rankedBarChart(rows, { hue, emptyText }) {
+export function rankedBarChart(rows, { hue, emptyText, onCategoryClick }) {
   const width = 560;
   const rowH = 38;
   const barH = 22;
@@ -86,8 +86,9 @@ export function rankedBarChart(rows, { hue, emptyText }) {
     const y = i * rowH + gap;
     const w = Math.max((row.amount / max) * plotW, 4);
     const cx = labelW;
+    const catId = row.category?.id || row.categoryId || '';
     bars += `
-      <g class="bar-row" data-i="${i}" tabindex="0" role="img"
+      <g class="bar-row" data-i="${i}" data-cat-id="${esc(catId)}" tabindex="0" role="button" style="cursor: pointer;"
          aria-label="${esc(row.category.name)}: ${esc(money(row.amount))}">
         <text x="${labelW - 12}" y="${y + barH / 2 + 5}" text-anchor="end" class="bar-label">${esc(row.category.icon)} ${esc(row.category.name)}</text>
         <rect class="bar-hit" x="${cx}" y="${y}" width="${plotW}" height="${barH}" fill="transparent" />
@@ -113,7 +114,7 @@ export function rankedBarChart(rows, { hue, emptyText }) {
           const percent = total > 0 ? Math.round((row.amount / total) * 100) : 0;
           const point = evt.touches ? evt.touches[0] : evt;
           showTooltip((point?.clientX ?? 0) + 14, (point?.clientY ?? 0) + 14, [
-            { label: `${row.category.name} · %${percent}`, value: money(row.amount) },
+            { label: `${row.category.name} · %${percent} (Filtrele)`, value: money(row.amount) },
           ]);
         };
         el.addEventListener('pointermove', move);
@@ -124,6 +125,13 @@ export function rankedBarChart(rows, { hue, emptyText }) {
         });
         el.addEventListener('pointerleave', hideTooltip);
         el.addEventListener('blur', hideTooltip);
+        el.addEventListener('click', () => {
+          hideTooltip();
+          if (typeof onCategoryClick === 'function') {
+            const catId = row.category?.id || row.categoryId || '';
+            onCategoryClick(catId, row.category?.name || '');
+          }
+        });
       });
     },
   };

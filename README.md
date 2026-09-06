@@ -42,6 +42,16 @@ npm test         # vitest birim testlerini çalıştırır
 26. **Tekrarlayan İşlemler (Idempotent):** Kira, maaş, abonelikleri ay bazında otomatik işleme ve dilediğinde aktif/pasif yapma.
 27. **Kategori Dağılımı & Trend Grafiği:** Bağımlılıksız SVG grafikler ile kategori kırılımı ve son 6 ayın gelir/gider çizgisi.
 28. **Akıllı Form Tarihi:** Geçmiş/gelecek ay incelenirken formun o aya göre akıllı açılması.
+29. **🛡️ IndexedDB Hibrit Depolama:** Fiş ve fatura fotoğraflarını `localStorage` kotasını (5MB) doldurmamak için arka planda `IndexedDB`'de saklama ve sıfır kayıplı otomatik migrasyon.
+30. **👆 Biyometrik Kilit (Face ID / Touch ID / WebAuthn):** PIN kilidine ek olarak cihaz destekliyorsa tek dokunuşla parmak izi veya yüz tanıma ile güvenli giriş.
+31. **⚡ Canlı Kurlar API:** Ayarlar ekranında tek dokunuşla canlı USD, EUR, GBP kurlarını çekme ve anlık TL hesaplama.
+32. **📅 Nakit Akışı & Yaklaşan Ödemeler Takvimi:** Ay sonuna kadar bekleyen fatura, kira ve taksitlerin gün bazlı takibi ve tahmini ay sonu kasa projeksiyonu.
+33. **🔄 Esnek Tekrarlayan İşlemler (Haftalık / Aylık / Yıllık):** MTV, kasko ve yıllık üyelikler ile haftalık harçlık ve giderler için frekans seçimi.
+34. **💳 Taksitlerde Son Ödeme / Hesap Kesim Günü:** Taksitli alışverişlerde her ayın tam ödeme gününü belirleme.
+35. **📊 Kategori Grafiği Drill-Down (İnteraktif Filtre):** Kategori çubuk grafiğinde bir kategoriye tıklandığında anında o kategoriye filtreleme ve çip ile tek tıkla geri alma.
+36. **💡 Akıllı Finansal İçgörüler (Smart Insights):** Tasarruf oranı, bütçe tüketim hızı ve kategori harcama artışlarını tespit edip dinamik tavsiyeler sunan asistan kartları.
+37. **🗓️ Genişletilmiş Tarih Aralığı Filtresi:** "Bu Ay" dışında "Son 30 Gün", "Son 3 Ay" ve "Bu Yıl" filtre seçenekleri.
+38. **🔔 Fatura & Taksit Bildirimleri (Web Notifications API):** Vadesi gelen ödemeler için yerel tarayıcı bildirimleri.
 
 ## Neden PWA (native değil)
 
@@ -144,6 +154,20 @@ Bu araç kişisel takip amaçlıdır; muhasebe veya vergi beyanı yerine geçmez
 ---
 
 ## 📝 Değişiklik Günlüğü (Changelog)
+
+### v0.7.0 (2026-09-06)
+- 🛡️ **IndexedDB Hibrit Depolama & Fiş Güvenliği:** Fiş görselleri `localStorage` kotasını (5MB) doldurmasın diye arka planda `IndexedDB`'ye taşındı; mevcut fotoğraflar için sıfır veri kayıplı otomatik migrasyon kuruldu.
+- 👆 **Biyometrik Kilit (Face ID / Touch ID / WebAuthn):** 4 haneli PIN koduna ek olarak cihazın biyometrik doğrulama donanımıyla tek dokunuşla kilit açma sağlandı.
+- ⚡ **Canlı Kurlar API Entegrasyonu:** TCMB / döviz kurlarını tek tıkla çekip USD, EUR ve GBP tutarlarını güncelleyen sistem eklendi.
+- 📅 **Aylık Nakit Akışı & Yaklaşan Ödemeler:** Ay sonuna kadar bekleyen fatura, taksit ve sabit giderlerin gün sıralı takibi ve tahmini ay sonu bakiye projeksiyonu.
+- 🔄 **Haftalık / Aylık / Yıllık Tekrarlayan İşlemler:** MTV, kasko ve yıllık üyelikler ile haftalık harçlık ve giderler için frekans seçimi desteği.
+- 💳 **Taksitlerde Son Ödeme / Hesap Kesim Günü:** Kredi kartı taksitleri için her ayın kesim günü seçeneği.
+- 📊 **İnteraktif Grafik Drill-Down:** Kategori çubuk grafiğine tıklandığında anında o kategoriye filtreleme ve çip ile tek tıkla geri alma.
+- 💡 **Akıllı Finansal İçgörüler (Smart Insights):** Tasarruf başarısı, bütçe tüketim hızı ve kategori harcama artışlarını bildiren dinamik tavsiye kartları.
+- 🗓️ **Genişletilmiş Tarih Aralığı Filtresi:** "Bu Ay" dışında "Son 30 Gün", "Son 3 Ay" ve "Bu Yıl" filtre seçenekleri.
+- 🔔 **Fatura & Taksit Bildirimleri:** Vadesi gelen ödemeler için yerel tarayıcı bildirimleri (Web Notifications API).
+- 📲 **PWA Web Share Target:** Cihazdan veya harici uygulamalardan Bütçe Defteri'ne hızlı işlem paylaşım yakalayıcısı.
+- 🧪 **34 Kapsamlı Birim Testi:** %100 doğrulukla tüm yeni modeller ve işlevler test edildi.
 
 ### v0.6.0 (2026-08-14)
 - 🗂️ **Modern Sekmeli Arayüz Mimarisi (Tab Navigation):** Monolitik ve uzun sayfa akışı 4 net, odaklı ve modern sekmeye bölündü (`📊 İşlemler`, `📈 Analiz & Grafikler`, `🎯 Planlama & Birikim`, `⚙️ Araçlar & Ayarlar`).
