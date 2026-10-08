@@ -48,7 +48,11 @@ export async function showReminder(title, options) {
   }
 }
 
-export async function checkUpcomingReminders(state, referenceDate = new Date()) {
+/**
+ * `hideAmounts` açıkken (gizlilik modu) bildirim gövdesinde ad ve tutar yazılmaz:
+ * kilit ekranında görünebileceği için yalnızca genel bir uyarı gösterilir.
+ */
+export async function checkUpcomingReminders(state, referenceDate = new Date(), { hideAmounts = false } = {}) {
   if (!isNotificationSupported() || Notification.permission !== 'granted') return false;
 
   const todayStr = localDateStr(referenceDate);
@@ -84,10 +88,15 @@ export async function checkUpcomingReminders(state, referenceDate = new Date()) 
 
   if (dueItems.length === 0) return false;
 
-  const total = dueItems.reduce((acc, item) => acc + item.amount, 0);
-  const titles = dueItems.map((i) => i.name).slice(0, 2).join(', ');
-  const more = dueItems.length > 2 ? ` ve ${dueItems.length - 2} diğer` : '';
-  const body = `Bugün/yarın yaklaşan ödeme: ${titles}${more} (Toplam: ₺${total.toLocaleString('tr-TR')})`;
+  let body;
+  if (hideAmounts) {
+    body = 'Bugün veya yarın yaklaşan bir ödemeniz var. Ayrıntı için uygulamayı açın.';
+  } else {
+    const total = dueItems.reduce((acc, item) => acc + item.amount, 0);
+    const titles = dueItems.map((i) => i.name).slice(0, 2).join(', ');
+    const more = dueItems.length > 2 ? ` ve ${dueItems.length - 2} diğer` : '';
+    body = `Bugün/yarın yaklaşan ödeme: ${titles}${more} (Toplam: ₺${total.toLocaleString('tr-TR')})`;
+  }
 
   const shown = await showReminder('Bütçe Defteri: Yaklaşan Ödeme', {
     body,

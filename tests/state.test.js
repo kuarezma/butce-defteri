@@ -9,6 +9,7 @@ import {
   setBudget, addCustomCategory, removeCustomCategory, updateCustomCategory,
   addGoal, removeGoal, updateGoal, contributeToGoal,
   periodKey, shiftPeriod,
+  load, getRawBackup, RAW_BACKUP_KEY,
 } from '../src/state.js';
 
 describe('state.js unit tests', () => {
@@ -230,6 +231,24 @@ describe('state.js unit tests', () => {
     expect(recurringDaysInPeriod({ frequency: 'weekly', day: 3 }, '2026-10')).toEqual([3, 10, 17, 24, 31]);
     expect(recurringDaysInPeriod({ frequency: 'yearly', day: 15, month: 3 }, '2026-10')).toEqual([]);
     expect(recurringDaysInPeriod({ frequency: 'yearly', day: 15, month: 10 }, '2026-10')).toEqual([15]);
+  });
+
+  it('getRawBackup returns the unparsable payload kept by load()', () => {
+    const store = new Map();
+    globalThis.localStorage = {
+      getItem: (k) => (store.has(k) ? store.get(k) : null),
+      setItem: (k, v) => store.set(k, String(v)),
+      removeItem: (k) => store.delete(k),
+    };
+    try {
+      expect(getRawBackup()).toBeNull();
+      store.set('butceDefteri.v1', '{bozuk');
+      load();
+      expect(getRawBackup()).toBe('{bozuk');
+      expect(store.get(RAW_BACKUP_KEY)).toBe('{bozuk');
+    } finally {
+      delete globalThis.localStorage;
+    }
   });
 
   it('serialize includes receipts only when provided', () => {

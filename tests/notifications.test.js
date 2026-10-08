@@ -59,6 +59,13 @@ describe('checkUpcomingReminders takvim kuralları', () => {
     expect(calls[0].title).toBe('Bütçe Defteri: Yaklaşan Ödeme');
   });
 
+  it('hideAmounts açıkken bildirimde ad ve tutar yazmaz', async () => {
+    const state = normalize({ recurring: [mtv], installments: [kart] });
+    expect(await checkUpcomingReminders(state, new Date(2026, 2, 15, 12), { hideAmounts: true })).toBe(true);
+    expect(calls[0].body).not.toContain('MTV');
+    expect(calls[0].body).not.toContain('₺');
+  });
+
   it('haftalık kalem day, day+7, ... günlerinde bildirir', async () => {
     const state = normalize({ recurring: [rec({ name: 'Haftalık', day: 3, frequency: 'weekly' })], installments: [] });
     for (const d of [3, 10, 17, 24, 31]) {

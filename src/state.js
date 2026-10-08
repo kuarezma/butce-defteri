@@ -265,6 +265,15 @@ export function keepPreImportSnapshot(current) {
   }
 }
 
+/** Yüklemede kurtarılamayan ham veri (yoksa null). Kullanıcı indirip geri yükleyebilir. */
+export function getRawBackup() {
+  try {
+    return getStorage().getItem(RAW_BACKUP_KEY);
+  } catch {
+    return null;
+  }
+}
+
 function countDropped(parsed, state) {
   const pairs = [
     ['transactions', state.transactions],
