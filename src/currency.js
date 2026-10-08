@@ -1,5 +1,6 @@
 // src/currency.js
-// Canlı Döviz Kuru API Entegrasyonu (CORS ve offline fallback destekli)
+// Canlı döviz kuru: open.er-api.com (anahtar gerektirmez). Ağ yoksa veya yanıt
+// geçersizse { success: false } döner; mevcut kurlar çağıran tarafta korunur.
 
 export async function fetchLiveRates() {
   try {

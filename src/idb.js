@@ -51,13 +51,15 @@ export async function saveReceiptImage(id, dataUrl) {
   const db = await openReceiptDb();
   if (!db) return false;
 
+  // Kota aşımı çoğu tarayıcıda commit aşamasında (abort) ortaya çıkar; bu yüzden
+  // başarı yalnızca transaction tamamlandığında bildirilir.
   return new Promise((resolve) => {
     try {
       const tx = db.transaction(STORE_NAME, 'readwrite');
-      const store = tx.objectStore(STORE_NAME);
-      const req = store.put({ id, dataUrl, savedAt: Date.now() });
-      req.onsuccess = () => resolve(true);
-      req.onerror = () => resolve(false);
+      tx.objectStore(STORE_NAME).put({ id, dataUrl, savedAt: Date.now() });
+      tx.oncomplete = () => resolve(true);
+      tx.onerror = () => resolve(false);
+      tx.onabort = () => resolve(false);
     } catch {
       resolve(false);
     }
@@ -96,6 +98,34 @@ export async function deleteReceiptImage(id) {
       const req = store.delete(id);
       req.onsuccess = () => resolve(true);
       req.onerror = () => resolve(false);
+    } catch {
+      resolve(false);
+    }
+  });
+}
+
+/**
+ * `keepIds` içinde olmayan tüm fiş görsellerini siler. Boş dizi verilirse hepsi silinir.
+ * Sıfırlama ve yedek geri yükleme sonrası yetim görselleri temizlemek için kullanılır.
+ */
+export async function pruneReceiptImages(keepIds = []) {
+  const db = await openReceiptDb();
+  if (!db) return false;
+  const keep = new Set(keepIds);
+
+  return new Promise((resolve) => {
+    try {
+      const tx = db.transaction(STORE_NAME, 'readwrite');
+      const req = tx.objectStore(STORE_NAME).openCursor();
+      req.onsuccess = () => {
+        const cursor = req.result;
+        if (!cursor) return;
+        if (!keep.has(cursor.key)) cursor.delete();
+        cursor.continue();
+      };
+      tx.oncomplete = () => resolve(true);
+      tx.onerror = () => resolve(false);
+      tx.onabort = () => resolve(false);
     } catch {
       resolve(false);
     }

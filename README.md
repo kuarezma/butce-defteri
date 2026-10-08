@@ -26,8 +26,8 @@ npm test         # vitest birim testlerini çalıştırır
 10. **🎯 Hedef Birikimler (Kumbara):** Tatil, acil durum fonu veya teknoloji için birikim hedefleri oluşturma, para ekleme/çekme ve ilerleme takibi.
 11. **📅 Aylık Harcama Isı Haritası (Calendar Heatmap):** Ayın günlerine göre harcama yoğunluğu görsel takvimi ve güne tıklayarak filtreleme.
 12. **📊 Yıllık Özet & Karşılaştırma Raporu (Annual Overview):** 12 ayın gelir/gider/tasarruf kümülatif tablosu ve yılın en çok harcanan ilk 5 kategorisi.
-13. **📥 CSV / Excel İçe Aktarma (Import Transactions):** Banka veya harici tablolardan `.csv` formatında toplu işlem yükleme.
-14. **🔒 PIN Kodu / Kilit Ekranı:** 4 haneli PIN ile uygulama açılışını kilitleme ve gizliliği koruma.
+13. **📥 CSV / Excel İçe Aktarma (Import Transactions):** Banka veya harici tablolardan `.csv` formatında toplu işlem yükleme. Bu uygulamanın dışa aktardığı dosyalar başlık ile okunur; kimliği zaten kayıtlı işlemler tekrar eklenmez.
+14. **🔒 PIN Kodu / Kilit Ekranı:** 4 haneli PIN ile uygulama açılışını kilitleme (PBKDF2 ile tuzlu hash; 5 hatalı denemede geçici kilit). Bu bir gizlilik kilididir: veriler şifrelenmez, cihaza erişimi olan biri depolamayı okuyabilir.
 15. **👁️ Gizlilik / Bakiye Gizleme Modu:** Toplu taşıma veya kalabalık yerlerde tek tıkla tüm parasal tutarları `₺••••` olarak maskeleme (`localStorage` kalıcı).
 16. **🧠 50/30/20 Bütçe Kuralı & Akıllı İçgörüler:** Harcamaları otomatik olarak İhtiyaçlar (%50), İstekler (%30) ve Tasarruf (%20) olarak sınıflandırıp görsel bar ve akıllı finansal tavsiyeler sunma.
 17. **🎨 Özel Kategori Yönetimi:** Kullanıcının dilediği ikon/emoji ve 50/30/20 sınıfı ile özel gelir/gider kategorileri tanımlayabilmesi.
@@ -37,13 +37,13 @@ npm test         # vitest birim testlerini çalıştırır
 21. **Anlık Arama & Filtreleme:** Ayın işlemlerinde açıklamaya veya kategoriye göre anında filtreleme, Gider/Gelir/Tümü filtre sekmeleri.
 22. **Tasarruf / Birikim Oranı (%):** Gelirin yüzde kaçının tasarruf edildiğini gösteren dinamik istatistik kartı.
 23. **Excel / CSV Dışa Aktarma:** UTF-8 BOM destekli, Excel ve Numbers ile tam uyumlu Türkçe karakterli `.csv` rapor indirme.
-24. **JSON Yedekleme ve Geri Yükleme:** Cihazlar arası veya veri güvenliği için tam durum (state) yedekleme/yükleme.
+24. **JSON Yedekleme ve Geri Yükleme:** Cihazlar arası veya veri güvenliği için tam durum (state) ve fiş fotoğrafları dahil yedekleme/yükleme. Geri yükleme mevcut verinin yerine geçer ve önce onay ister.
 25. **Bütçe Limitleri & Uyarı Renkleri:** Kategori bazında limit koyma, %70 (uyarı), %90 (ciddi), %100 (kritik) ilerleme çubukları.
 26. **Tekrarlayan İşlemler (Idempotent):** Kira, maaş, abonelikleri ay bazında otomatik işleme ve dilediğinde aktif/pasif yapma.
 27. **Kategori Dağılımı & Trend Grafiği:** Bağımlılıksız SVG grafikler ile kategori kırılımı ve son 6 ayın gelir/gider çizgisi.
 28. **Akıllı Form Tarihi:** Geçmiş/gelecek ay incelenirken formun o aya göre akıllı açılması.
 29. **🛡️ IndexedDB Hibrit Depolama:** Fiş ve fatura fotoğraflarını `localStorage` kotasını (5MB) doldurmamak için arka planda `IndexedDB`'de saklama ve sıfır kayıplı otomatik migrasyon.
-30. **👆 Biyometrik Kilit (Face ID / Touch ID / WebAuthn):** PIN kilidine ek olarak cihaz destekliyorsa tek dokunuşla parmak izi veya yüz tanıma ile güvenli giriş.
+30. **👆 Biyometrik Kilit (Face ID / Touch ID / WebAuthn):** PIN kilidine ek olarak cihaz destekliyorsa tek dokunuşla parmak izi veya yüz tanıma ile açma. Sunucu olmadığı için doğrulama cihaz içi bir kısayoldur; assertion imzası kriptografik olarak doğrulanmaz.
 31. **⚡ Canlı Kurlar API:** Ayarlar ekranında tek dokunuşla canlı USD, EUR, GBP kurlarını çekme ve anlık TL hesaplama.
 32. **📅 Nakit Akışı & Yaklaşan Ödemeler Takvimi:** Ay sonuna kadar bekleyen fatura, kira ve taksitlerin gün bazlı takibi ve tahmini ay sonu kasa projeksiyonu.
 33. **🔄 Esnek Tekrarlayan İşlemler (Haftalık / Aylık / Yıllık):** MTV, kasko ve yıllık üyelikler ile haftalık harçlık ve giderler için frekans seçimi.
@@ -51,7 +51,7 @@ npm test         # vitest birim testlerini çalıştırır
 35. **📊 Kategori Grafiği Drill-Down (İnteraktif Filtre):** Kategori çubuk grafiğinde bir kategoriye tıklandığında anında o kategoriye filtreleme ve çip ile tek tıkla geri alma.
 36. **💡 Akıllı Finansal İçgörüler (Smart Insights):** Tasarruf oranı, bütçe tüketim hızı ve kategori harcama artışlarını tespit edip dinamik tavsiyeler sunan asistan kartları.
 37. **🗓️ Genişletilmiş Tarih Aralığı Filtresi:** "Bu Ay" dışında "Son 30 Gün", "Son 3 Ay" ve "Bu Yıl" filtre seçenekleri.
-38. **🔔 Fatura & Taksit Bildirimleri (Web Notifications API):** Vadesi gelen ödemeler için yerel tarayıcı bildirimleri.
+38. **🔔 Fatura & Taksit Bildirimleri (Web Notifications API):** Bugün veya yarın vadesi gelen ödemeler için yerel tarayıcı bildirimleri. Kontrol uygulama açıldığında yapılır; arka planda zamanlanmış bildirim yoktur. Bildirim metni tutarları içerir ve kilit ekranında görünebilir.
 
 ## Neden PWA (native değil)
 
@@ -96,18 +96,27 @@ doğrudan taşınacak şekilde tasarlandı: DOM'dan bağımsız, saf JS.
 
 ## Veri ve yedekleme
 
-`localStorage["butceDefteri.v1"]` — şema versiyonlu, bozuk veriye dayanıklı
-(bkz. `src/state.js:normalize`). **localStorage kalıcı değildir**: Safari
-verisi temizlenince veya cihaz değişince gider. **Yedek al (JSON)** düğmesi
-bu yüzden çekirdek özellik, süs değil.
+`localStorage["butceDefteri.v1"]` — şema versiyonlu (bkz. `src/state.js:normalize`).
+Yüklemede geçersiz bir kayıt atlanırsa veya dosya bozuksa ham içerik
+`localStorage["butceDefteri.v1.rawBackup"]` anahtarında saklanır; bir sonraki
+kayıt onu silmez. **localStorage kalıcı değildir**: Safari verisi temizlenince
+veya cihaz değişince gider. **Yedek al (JSON)** düğmesi bu yüzden çekirdek
+özellik, süs değil; fiş fotoğrafları (IndexedDB) dahil edilir.
 
 ```js
 {
   schema: 1,
-  transactions: [{ id, type, amount, categoryId, date, note, recurringId, createdAt }],
-  recurring: [{ id, name, type, amount, categoryId, day, active, note }],
+  transactions: [{ id, type, amount, currency, originalAmount, categoryId, date, note,
+                   recurringId, installmentId, hasReceipt, createdAt }],
+  recurring: [{ id, name, type, amount, categoryId, day, frequency, month, active, note }],
+  installments: [{ id, name, totalAmount, monthlyAmount, totalInstallments, startPeriod, dueDay, categoryId, active }],
+  goals: [{ id, name, targetAmount, currentAmount, targetDate, icon }],
+  customCategories: [{ id, type, name, icon, bucket, active }],
+  currencies: { USD, EUR, GBP, GLD },
+  currencyLastUpdated: "ISO-8601",
   budgets: { [categoryId]: monthlyLimit },
   materialized: { "YYYY-MM": [recurringId, ...] },
+  receipts: { [transactionId]: "data:image/jpeg;base64,..." }, // yalnızca yedek dosyasında
 }
 ```
 
@@ -117,13 +126,18 @@ bu yüzden çekirdek özellik, süs değil.
 |---|---|
 | `src/data/categories.js` | Kategori tanımları — tek kaynak, kalıcı id'ler |
 | `src/palette.js` | Sabit renk sırası (dataviz iskeletinin referans paleti) |
-| `src/state.js` | Şema versiyonlu depolama, doğrulama, materyalizasyon |
-| `src/compute.js` | Aylık toplam, kategori kırılımı, trend, bütçe durumu, tasarruf oranı — DOM'a bakmaz |
+| `src/state.js` | Şema versiyonlu depolama, doğrulama, tekrarlayan/taksit materyalizasyonu |
+| `src/compute.js` | Aylık toplam, kategori kırılımı, trend, bütçe durumu, taksit ve tasarruf hesapları — DOM'a bakmaz |
 | `src/charts.js` | Bağımlılıksız SVG grafikler (sıralı çubuk, çizgi) + hover/tooltip |
 | `src/render.js` | Veriden DOM üretimi |
-| `src/export.js` | Excel / Numbers uyumlu CSV dışa aktarma |
+| `src/export.js` | Excel / Numbers uyumlu CSV dışa aktarma ve başlık tabanlı içe aktarma (kimlikli) |
+| `src/notifications.js` | Yerel ödeme hatırlatıcıları (bugün/yarın, yıllık/haftalık/taksit kuralları) |
+| `src/pin.js` | PIN: PBKDF2 ile tuzlu hash, deneme sınırı ve geçici kilit |
+| `src/biometrics.js` | WebAuthn platform doğrulaması (cihaz içi kısayol; sunucu olmadığı için imza doğrulanmaz) |
+| `src/idb.js` | Fiş görsellerinin IndexedDB deposu, migrasyon ve yetim kayıt temizliği |
+| `src/currency.js` | Canlı kur çekme (open.er-api.com) |
 | `src/main.js` | Olay bağlama, ay gezinme, arama/filtre, düzenleme modalleri, yedek al/yükle |
-| `tests/` | Vitest ile yazılmış `state` ve `compute` birim testleri |
+| `tests/` | Vitest birim testleri: `state`, `compute`, `export`, `pin`, `notifications`, `idb` |
 | `vite.config.js` | PWA manifest + service worker (`vite-plugin-pwa`) |
 
 ## Grafik tasarımı
@@ -155,10 +169,21 @@ Bu araç kişisel takip amaçlıdır; muhasebe veya vergi beyanı yerine geçmez
 
 ## 📝 Değişiklik Günlüğü (Changelog)
 
+### Unreleased (denetim düzeltmeleri)
+- 📥 **CSV içe aktarma:** Dışa aktarılan dosya başlıkla okunur; kategori ve not doğru geri gelir, kimliği zaten kayıtlı işlemler tekrar eklenmez.
+- 🔔 **Bildirimler:** Yıllık ve haftalık kalemler yalnızca doğru günlerde bildirilir; bitmiş veya başlamamış taksitler bildirilmez; tarih kontrolü yerel saate göre yapılır; ay sonu "yarın" hesabı düzeltildi.
+- 💳 **Taksit:** Son taksit kuruş farkını taşır (ör. 1.000 ₺ / 3 → 333,33 + 333,34). Kalan borç buna göre hesaplanır.
+- 🔁 **Yıllık tekrarlayan:** Ödeme ayı seçilebilir (önceden her zaman Ocak'a düşüyordu). Haftalık kalemde gün 1–7 arasıdır; her 7 günde bir işlenir (eski kayıtlar aynı şekilde devam eder).
+- 🔐 **PIN:** PBKDF2 ile tuzlu hash (eski PIN'ler ilk doğru girişte yeni formata geçer); 5 hatalı denemede geçici kilit. Biyometrik kayıt, credential ID'yi saklar ve yalnızca o kimlikle açar.
+- 💾 **Yedek:** Fiş fotoğrafları dahil edilir. Geri yükleme onay ister, doğrulama bitmeden mevcut veriye dokunmaz ve yetim fiş görsellerini temizler. Fiş görseli kaydedilemezse görsel kaybolmaz, uyarı verilir. "Sıfırla" fiş görsellerini de siler. Geri yüklemeden önceki durum `butceDefteri.v1.beforeImport` anahtarında bir kez saklanır (arayüzde geri alma düğmesi yok).
+- 🗃️ **Veri koruma:** Bozuk veya atlanan kayıtların ham hali `butceDefteri.v1.rawBackup` içinde saklanır; mevcut bir ham kopya üzerine yazılmaz. Kur zaman damgası yeniden açılışta korunur.
+- 🛡️ **Silme:** İşlem, taksit, hedef ve tekrarlayan silmede onay istenir. Kullanımda olan özel kategori silinmez.
+- 🧪 **CI:** Deploy öncesi `npm test` çalışır.
+
 ### v0.7.0 (2026-09-06)
 - 🛡️ **IndexedDB Hibrit Depolama & Fiş Güvenliği:** Fiş görselleri `localStorage` kotasını (5MB) doldurmasın diye arka planda `IndexedDB`'ye taşındı; mevcut fotoğraflar için sıfır veri kayıplı otomatik migrasyon kuruldu.
 - 👆 **Biyometrik Kilit (Face ID / Touch ID / WebAuthn):** 4 haneli PIN koduna ek olarak cihazın biyometrik doğrulama donanımıyla tek dokunuşla kilit açma sağlandı.
-- ⚡ **Canlı Kurlar API Entegrasyonu:** TCMB / döviz kurlarını tek tıkla çekip USD, EUR ve GBP tutarlarını güncelleyen sistem eklendi.
+- ⚡ **Canlı Kurlar API Entegrasyonu:** open.er-api.com üzerinden döviz kurlarını tek tıkla çekip USD, EUR ve GBP tutarlarını güncelleyen sistem eklendi.
 - 📅 **Aylık Nakit Akışı & Yaklaşan Ödemeler:** Ay sonuna kadar bekleyen fatura, taksit ve sabit giderlerin gün sıralı takibi ve tahmini ay sonu bakiye projeksiyonu.
 - 🔄 **Haftalık / Aylık / Yıllık Tekrarlayan İşlemler:** MTV, kasko ve yıllık üyelikler ile haftalık harçlık ve giderler için frekans seçimi desteği.
 - 💳 **Taksitlerde Son Ödeme / Hesap Kesim Günü:** Kredi kartı taksitleri için her ayın kesim günü seçeneği.
