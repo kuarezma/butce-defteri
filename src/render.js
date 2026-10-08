@@ -242,6 +242,12 @@ export function renderBudgetList(container, rows) {
 
 // ---------- Tekrarlayan işlemler ----------
 
+function recurringScheduleLabel(r) {
+  if (r.frequency === 'weekly') return `haftalık · ayın ${Math.min(r.day, 7)}. gününden başlayıp her 7 günde bir`;
+  if (r.frequency === 'yearly') return `yıllık · ${monthNames[(r.month || 1) - 1]} ${r.day}. günü`;
+  return `her ayın ${r.day}. günü`;
+}
+
 export function renderRecurringList(container, list, customCategories = []) {
   if (list.length === 0) {
     container.innerHTML = '<li class="empty-row">Henüz tekrarlayan işlem yok.</li>';
@@ -256,7 +262,7 @@ export function renderRecurringList(container, list, customCategories = []) {
         <span class="tx-icon" aria-hidden="true">${esc(cat.icon)}</span>
         <div class="tx-main">
           <div class="tx-title">${esc(r.name)}${r.active ? '' : ' (pasif)'}</div>
-          <div class="tx-sub">${esc(cat.name)} · her ayın ${r.day}. günü</div>
+          <div class="tx-sub">${esc(cat.name)} · ${esc(recurringScheduleLabel(r))}</div>
         </div>
         <span class="tx-amount" data-type="${r.type}">${sign}${esc(money(r.amount))}</span>
         <div class="row-actions">

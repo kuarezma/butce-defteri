@@ -1,21 +1,17 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import {
   normalize, SCHEMA,
   addTransaction, removeTransaction, updateTransaction, transactionsInMonth,
   addRecurring, removeRecurring, updateRecurring, setRecurringActive, materializeRecurring,
   addInstallment, removeInstallment, updateInstallment, materializeInstallments,
-  setCurrencyRate, convertToTRY,
+  installmentAmountFor, installmentRemainingAmount, recurringDaysInPeriod,
+  setCurrencyRate, convertToTRY, serialize,
   setBudget, addCustomCategory, removeCustomCategory, updateCustomCategory,
   addGoal, removeGoal, updateGoal, contributeToGoal,
-  setPin, verifyPin, removePin, hasPin,
   periodKey, shiftPeriod,
 } from '../src/state.js';
 
 describe('state.js unit tests', () => {
-  beforeEach(() => {
-    removePin();
-  });
-
   it('normalize returns empty state for null or invalid inputs', () => {
     const s = normalize(null);
     expect(s.schema).toBe(SCHEMA);
@@ -197,17 +193,50 @@ describe('state.js unit tests', () => {
     expect(s.goals.length).toBe(0);
   });
 
-  it('setPin, verifyPin and removePin work reliably', () => {
-    expect(hasPin()).toBe(false);
-    expect(verifyPin('1234')).toBe(true); // no pin set
+  it('keeps currencyLastUpdated across normalize (reload) and drops invalid values', () => {
+    const s = normalize({ currencyLastUpdated: '2026-10-08T10:00:00.000Z' });
+    expect(s.currencyLastUpdated).toBe('2026-10-08T10:00:00.000Z');
+    expect(normalize({ currencyLastUpdated: 'not-a-date' }).currencyLastUpdated).toBeUndefined();
+  });
 
-    setPin('1905');
-    expect(hasPin()).toBe(true);
-    expect(verifyPin('1905')).toBe(true);
-    expect(verifyPin('1234')).toBe(false);
+  it('splits installment amounts so the last payment absorbs the rounding remainder', () => {
+    const s = normalize({});
+    const ins = addInstallment(s, { name: 'Telefon', totalAmount: 1000, totalInstallments: 3, startPeriod: '2026-01' });
+    expect(installmentAmountFor(ins, 1)).toBe(333.33);
+    expect(installmentAmountFor(ins, 2)).toBe(333.33);
+    expect(installmentAmountFor(ins, 3)).toBe(333.34);
+    const total = [1, 2, 3].reduce((sum, n) => sum + installmentAmountFor(ins, n), 0);
+    expect(Number(total.toFixed(2))).toBe(1000);
+    expect(installmentRemainingAmount(ins, 0)).toBe(1000);
+    expect(installmentRemainingAmount(ins, 3)).toBe(0);
+  });
 
-    removePin();
-    expect(hasPin()).toBe(false);
+  it('materializes the adjusted last installment amount', () => {
+    const s = normalize({});
+    addInstallment(s, { name: 'Telefon', totalAmount: 1000, totalInstallments: 3, startPeriod: '2026-01' });
+    materializeInstallments(s, '2026-03');
+    expect(s.transactions[0].amount).toBe(333.34);
+  });
+
+  it('keeps imported transaction ids and createdAt so re-import can dedupe', () => {
+    const s = normalize({});
+    const t = addTransaction(s, { id: 'csv-abc-123', type: 'expense', amount: 50, categoryId: 'gider-market', date: '2026-10-05', createdAt: '2026-10-01T00:00:00.000Z' });
+    expect(t.id).toBe('csv-abc-123');
+    expect(t.createdAt).toBe('2026-10-01T00:00:00.000Z');
+  });
+
+  it('weekly recurring anchor is clamped to 1-7 (same as previously materialized months)', () => {
+    expect(recurringDaysInPeriod({ frequency: 'weekly', day: 20 }, '2026-10')).toEqual([7, 14, 21, 28]);
+    expect(recurringDaysInPeriod({ frequency: 'weekly', day: 3 }, '2026-10')).toEqual([3, 10, 17, 24, 31]);
+    expect(recurringDaysInPeriod({ frequency: 'yearly', day: 15, month: 3 }, '2026-10')).toEqual([]);
+    expect(recurringDaysInPeriod({ frequency: 'yearly', day: 15, month: 10 }, '2026-10')).toEqual([15]);
+  });
+
+  it('serialize includes receipts only when provided', () => {
+    const s = normalize({});
+    expect(JSON.parse(serialize(s)).receipts).toBeUndefined();
+    const withReceipts = JSON.parse(serialize(s, { 'tx-1': 'data:image/jpeg;base64,AAA' }));
+    expect(withReceipts.receipts['tx-1']).toBe('data:image/jpeg;base64,AAA');
   });
 
   it('handles weekly and yearly recurring properly in materializeRecurring', () => {

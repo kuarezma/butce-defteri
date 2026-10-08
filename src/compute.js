@@ -1,4 +1,4 @@
-import { transactionsInMonth, shiftPeriod } from './state.js';
+import { transactionsInMonth, shiftPeriod, installmentAmountFor, installmentRemainingAmount } from './state.js';
 import { categoryById } from './data/categories.js';
 import { CATEGORY_CHART_CAP } from './palette.js';
 
@@ -284,10 +284,10 @@ export function installmentStats(state, currentPeriod) {
     const currentInstallment = Math.max(0, Math.min(ins.totalInstallments, monthDiff + 1));
     const paidCount = Math.max(0, Math.min(ins.totalInstallments, monthDiff));
     const remainingCount = Math.max(0, ins.totalInstallments - paidCount);
-    const remainingDebt = Number((remainingCount * ins.monthlyAmount).toFixed(2));
+    const remainingDebt = installmentRemainingAmount(ins, paidCount);
     const isActiveThisMonth = ins.active && monthDiff >= 0 && monthDiff < ins.totalInstallments;
 
-    if (isActiveThisMonth) totalMonthly += ins.monthlyAmount;
+    if (isActiveThisMonth) totalMonthly += installmentAmountFor(ins, monthDiff + 1);
     if (ins.active) totalRemainingDebt += remainingDebt;
 
     return {
@@ -521,7 +521,7 @@ export function cashFlowProjection(state, periodKeyStr, referenceDate = new Date
         upcomingPayments.push({
           id: `inst-${ins.id}`,
           name: `${ins.name} (${monthDiff + 1}/${ins.totalInstallments})`,
-          amount: ins.monthlyAmount,
+          amount: installmentAmountFor(ins, monthDiff + 1),
           categoryId: ins.categoryId,
           day,
           date,

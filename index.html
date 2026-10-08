@@ -2,7 +2,7 @@
 <html lang="tr">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="theme-color" content="#07090e" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
@@ -432,8 +432,26 @@
                 <label class="field">
                   <span>Gün</span>
                   <input type="number" name="day" min="1" max="28" value="1" required />
+                  <small class="field-hint">Haftalıkta 1–7</small>
                 </label>
               </div>
+              <label class="field" id="rec-month-field" style="display: none">
+                <span>Yıllık ödeme ayı</span>
+                <select name="month" id="rec-month">
+                  <option value="1" selected>Ocak</option>
+                  <option value="2">Şubat</option>
+                  <option value="3">Mart</option>
+                  <option value="4">Nisan</option>
+                  <option value="5">Mayıs</option>
+                  <option value="6">Haziran</option>
+                  <option value="7">Temmuz</option>
+                  <option value="8">Ağustos</option>
+                  <option value="9">Eylül</option>
+                  <option value="10">Ekim</option>
+                  <option value="11">Kasım</option>
+                  <option value="12">Aralık</option>
+                </select>
+              </label>
               <label class="field">
                 <span>Kategori</span>
                 <select name="categoryId" id="rec-category" required></select>

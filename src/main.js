@@ -6,9 +6,10 @@ import {
   addInstallment, removeInstallment, materializeInstallments, setCurrencyRate, setCurrencyRates, convertToTRY,
   setBudget, addCustomCategory, removeCustomCategory,
   addGoal, removeGoal, updateGoal, contributeToGoal,
-  hasPin, setPin, verifyPin, removePin,
+  recoveredOnLoad, keepPreImportSnapshot,
   periodKey, shiftPeriod,
 } from './state.js';
+import { hasPin, setPin, verifyPin, removePin, pinLockRemainingMs } from './pin.js';
 import {
   monthTotals, categoryBreakdown, trendSeries, budgetStatus, trailingAverageExpense, savingsRate,
   computeFiftyThirtyTwenty, parseQuickEntry, annualSummary, dailyExpenseHeatmap,
@@ -23,9 +24,9 @@ import {
   renderInsights, renderCashFlow,
   monthLabel, setPrivacyMode, isPrivacyMode,
 } from './render.js';
-import { transactionsToCsv, downloadCsv, parseCsvToTransactions } from './export.js';
+import { transactionsToCsv, downloadCsv, parseCsvDetailed } from './export.js';
 import { getIcon } from './icons.js';
-import { openReceiptDb, saveReceiptImage, getReceiptImage, deleteReceiptImage, migrateReceiptsToIndexedDb } from './idb.js';
+import { openReceiptDb, saveReceiptImage, getReceiptImage, deleteReceiptImage, pruneReceiptImages, migrateReceiptsToIndexedDb } from './idb.js';
 import { isBiometricSupported, isBiometricEnabled, setBiometricEnabled, registerBiometric, authenticateBiometric } from './biometrics.js';
 import { fetchLiveRates } from './currency.js';
 import { isNotificationSupported, getNotificationPermission, requestNotificationPermission, checkUpcomingReminders } from './notifications.js';
@@ -53,7 +54,10 @@ migrateReceiptsToIndexedDb(state).then((count) => {
 });
 
 // Yaklaşan ödeme bildirimlerini kontrol et
-checkUpcomingReminders(state, currentPeriod);
+checkUpcomingReminders(state);
+
+// Tarayıcının depolamayı kendiliğinden silmemesi için kalıcılık iste (destekleniyorsa)
+navigator.storage?.persist?.();
 
 // Web Share Target yakalama
 const urlParams = new URLSearchParams(window.location.search);
@@ -317,12 +321,31 @@ function persist() {
   }
 }
 
-function localTodayIso() {
-  const now = new Date();
-  const y = now.getFullYear();
-  const m = String(now.getMonth() + 1).padStart(2, '0');
-  const d = String(now.getDate()).padStart(2, '0');
+// Yerel tarih (UTC değil): Türkiye'de gece yarısı–03:00 arasında gün kaymasını önler.
+function localIso(date) {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
   return `${y}-${m}-${d}`;
+}
+
+function localTodayIso() {
+  return localIso(new Date());
+}
+
+function localIsoDaysAgo(days) {
+  const d = new Date();
+  d.setDate(d.getDate() - days);
+  return localIso(d);
+}
+
+// Kategori bir kayıtta, tekrarlayanda, taksitte veya bütçede kullanılıyor mu?
+function customCategoryUses(id) {
+  const txCount = state.transactions.filter((t) => t.categoryId === id).length;
+  const recCount = state.recurring.filter((r) => r.categoryId === id).length;
+  const instCount = (state.installments || []).filter((i) => i.categoryId === id).length;
+  const budgetCount = state.budgets[id] ? 1 : 0;
+  return txCount + recCount + instCount + budgetCount;
 }
 
 function getDefaultDateForPeriod(period) {
@@ -376,14 +399,18 @@ if (bioQuickUnlockBtn) {
 }
 
 if (els.pinUnlockForm) {
-  els.pinUnlockForm.addEventListener('submit', (e) => {
+  els.pinUnlockForm.addEventListener('submit', async (e) => {
     e.preventDefault();
     const pin = els.pinUnlockInput.value.trim();
-    if (verifyPin(pin)) {
+    if (await verifyPin(pin)) {
       els.pinLockOverlay.hidden = true;
       els.pinUnlockInput.value = '';
       els.pinErrorMsg.hidden = true;
     } else {
+      const waitMs = pinLockRemainingMs();
+      els.pinErrorMsg.textContent = waitMs > 0
+        ? `Çok fazla hatalı deneme. ${Math.ceil(waitMs / 1000)} saniye sonra tekrar deneyin.`
+        : 'Hatalı PIN. Tekrar deneyin.';
       els.pinErrorMsg.hidden = false;
       els.pinUnlockInput.value = '';
       els.pinUnlockInput.focus();
@@ -550,17 +577,9 @@ function paint() {
   // Tarih aralığına göre işlemleri çek
   let txs = [];
   if (currentDateRange === '30days') {
-    const today = new Date();
-    const past = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000);
-    const start = past.toISOString().slice(0, 10);
-    const end = today.toISOString().slice(0, 10);
-    txs = filterTransactionsByRange(state, start, end).transactions;
+    txs = filterTransactionsByRange(state, localIsoDaysAgo(30), localTodayIso()).transactions;
   } else if (currentDateRange === '90days') {
-    const today = new Date();
-    const past = new Date(today.getTime() - 90 * 24 * 60 * 60 * 1000);
-    const start = past.toISOString().slice(0, 10);
-    const end = today.toISOString().slice(0, 10);
-    txs = filterTransactionsByRange(state, start, end).transactions;
+    txs = filterTransactionsByRange(state, localIsoDaysAgo(90), localTodayIso()).transactions;
   } else if (currentDateRange === 'year') {
     const y = currentPeriod.slice(0, 4);
     txs = filterTransactionsByRange(state, `${y}-01-01`, `${y}-12-31`).transactions;
@@ -641,6 +660,10 @@ updatePrivacyIcon();
 updateThemeIcon();
 updatePinIcon();
 paint();
+
+if (recoveredOnLoad()) {
+  status('Veri yüklemede bazı kayıtlar okunamadı; ham kopya tarayıcıda saklandı.', 'error');
+}
 
 // ---------- Isı Haritası Tıklama Filtresi ----------
 
@@ -801,6 +824,7 @@ if (els.installmentsList) {
   els.installmentsList.addEventListener('click', (e) => {
     const delBtn = e.target.closest('[data-delete-inst]');
     if (!delBtn) return;
+    if (!window.confirm('Bu taksit planı silinsin mi? Daha önce işlenmiş taksit kayıtları listede kalır.')) return;
     removeInstallment(state, delBtn.dataset.deleteInst);
     persist();
     paint();
@@ -1056,7 +1080,10 @@ if (els.pinForm) {
       status('PIN tam olarak 4 haneli rakam olmalıdır.', 'error');
       return;
     }
-    setPin(pin);
+    if (!(await setPin(pin))) {
+      status('PIN kaydedilemedi. Güvenli bağlantı (HTTPS) gerekebilir ya da tarayıcı depolaması kapalı olabilir.', 'error');
+      return;
+    }
     if (bioSetupToggle && bioSetupToggle.checked && !isBiometricEnabled()) {
       await registerBiometric();
     } else if (bioSetupToggle && !bioSetupToggle.checked && isBiometricEnabled()) {
@@ -1104,7 +1131,7 @@ if (notifBtn) {
     updateNotifStatus();
     if (granted) {
       status('Bildirim izni verildi! Yaklaşan ödemeler hatırlatılacak.');
-      checkUpcomingReminders(state, currentPeriod);
+      checkUpcomingReminders(state);
     } else {
       status('Bildirim izni alınamadı veya reddedildi.', 'error');
     }
@@ -1212,7 +1239,7 @@ els.txForm.addEventListener('submit', async (event) => {
     categoryId: form.get('categoryId'),
     date: form.get('date'),
     note: form.get('note'),
-    hasReceipt: Boolean(pendingReceiptData),
+    hasReceipt: false,
   });
 
   if (!t) {
@@ -1220,8 +1247,11 @@ els.txForm.addEventListener('submit', async (event) => {
     return;
   }
 
+  // Fiş kaydı başarısızsa işlem yine eklenir ama "fişli" işaretlenmez; kullanıcı uyarılır.
+  let receiptFailed = false;
   if (pendingReceiptData) {
-    await saveReceiptImage(t.id, pendingReceiptData);
+    t.hasReceipt = await saveReceiptImage(t.id, pendingReceiptData);
+    receiptFailed = !t.hasReceipt;
   }
 
   persist();
@@ -1234,7 +1264,11 @@ els.txForm.addEventListener('submit', async (event) => {
   els.txForm.date.value = getDefaultDateForPeriod(currentPeriod);
   fillCategorySelect(els.txCategory, 'expense', state.customCategories);
   setSegmentedValue(els.txForm.querySelector('.segmented'), els.txType, 'expense');
-  status('İşlem eklendi.');
+  if (receiptFailed) {
+    status('İşlem eklendi, ancak fiş fotoğrafı kaydedilemedi (tarayıcı depolaması dolu olabilir).', 'error');
+  } else {
+    status('İşlem eklendi.');
+  }
 });
 
 // ---------- İşlem Silme ve Düzenleme ----------
@@ -1244,6 +1278,7 @@ els.txList.addEventListener('click', (event) => {
   const editBtn = event.target.closest('[data-edit-tx]');
 
   if (deleteBtn) {
+    if (!window.confirm('Bu işlem silinsin mi?')) return;
     const txId = deleteBtn.dataset.deleteTx;
     removeTransaction(state, txId);
     deleteReceiptImage(txId);
@@ -1282,12 +1317,17 @@ els.editTxForm.addEventListener('submit', (event) => {
   event.preventDefault();
   const id = els.editTxId.value;
   const form = new FormData(els.editTxForm);
+  const previous = state.transactions.find((tx) => tx.id === id);
+  const newAmount = Number(form.get('amount'));
+  // Tutar değişirse döviz bilgisi eski kalmasın: işlem TL olarak girilmiş sayılır.
+  const amountChanged = previous && Number(previous.amount) !== newAmount;
   const updated = updateTransaction(state, id, {
     type: form.get('type'),
     amount: form.get('amount'),
     categoryId: form.get('categoryId'),
     date: form.get('date'),
     note: form.get('note'),
+    ...(amountChanged ? { currency: 'TRY', originalAmount: newAmount } : {}),
   });
 
   if (!updated) {
@@ -1348,6 +1388,7 @@ if (els.goalsList) {
     const deleteBtn = e.target.closest('[data-delete-goal]');
 
     if (deleteBtn) {
+      if (!window.confirm('Bu birikim hedefi silinsin mi?')) return;
       removeGoal(state, deleteBtn.dataset.deleteGoal);
       persist();
       paint();
@@ -1435,6 +1476,21 @@ wireSegmented(els.recurringForm.querySelector('.segmented'), els.recType, (type)
   fillCategorySelect(els.recCategory, type, state.customCategories);
 });
 
+// Sıklığa göre alanlar: ay yalnızca "Yıllık"ta görünür; haftalıkta gün 1-7 (kayıtlarla aynı kural)
+const recFrequency = document.getElementById('rec-frequency');
+const recMonthField = document.getElementById('rec-month-field');
+function syncRecurringFields() {
+  if (!recFrequency) return;
+  if (recMonthField) recMonthField.style.display = recFrequency.value === 'yearly' ? '' : 'none';
+  const dayInput = els.recurringForm.day;
+  dayInput.max = recFrequency.value === 'weekly' ? 7 : 28;
+  if (Number(dayInput.value) > Number(dayInput.max)) dayInput.value = dayInput.max;
+}
+if (recFrequency) {
+  recFrequency.addEventListener('change', syncRecurringFields);
+  syncRecurringFields();
+}
+
 els.recurringForm.addEventListener('submit', (event) => {
   event.preventDefault();
   const form = new FormData(els.recurringForm);
@@ -1445,6 +1501,7 @@ els.recurringForm.addEventListener('submit', (event) => {
     categoryId: form.get('categoryId'),
     day: form.get('day'),
     frequency: form.get('frequency') || 'monthly',
+    month: form.get('month'),
   });
   if (!r) {
     status('Tekrarlayan işlem eklenemedi — alanları kontrol et.', 'error');
@@ -1455,6 +1512,7 @@ els.recurringForm.addEventListener('submit', (event) => {
   paint();
   els.recurringForm.reset();
   els.recurringForm.day.value = '1';
+  syncRecurringFields();
   fillCategorySelect(els.recCategory, 'expense', state.customCategories);
   setSegmentedValue(els.recurringForm.querySelector('.segmented'), els.recType, 'expense');
   status('Tekrarlayan işlem eklendi.');
@@ -1468,6 +1526,7 @@ els.recurringList.addEventListener('click', (event) => {
   const edit = event.target.closest('[data-edit-recurring]');
 
   if (del) {
+    if (!window.confirm('Bu tekrarlayan işlem silinsin mi?')) return;
     removeRecurring(state, del.dataset.deleteRecurring);
     persist();
     renderRecurringList(els.recurringList, state.recurring, state.customCategories);
@@ -1576,6 +1635,12 @@ if (els.customCatList) {
     const btn = event.target.closest('[data-delete-custom-cat]');
     if (!btn) return;
     const id = btn.dataset.deleteCustomCat;
+    const uses = customCategoryUses(id);
+    if (uses > 0) {
+      status(`Bu kategori ${uses} kayıtta kullanılıyor. Önce bu kayıtların kategorisini değiştirin.`, 'error');
+      return;
+    }
+    if (!window.confirm('Bu özel kategori silinsin mi?')) return;
     removeCustomCategory(state, id);
     persist();
     refreshCategorySelects();
@@ -1611,17 +1676,32 @@ if (els.importCsvInput) {
     if (!file) return;
     try {
       const text = await file.text();
-      const importedTxs = parseCsvToTransactions(text, state.customCategories);
+      const { transactions: importedTxs, skipped } = parseCsvDetailed(text, state.customCategories);
       if (importedTxs.length === 0) {
-        status('CSV dosyasında geçerli işlem satırı bulunamadı.', 'error');
+        status(`CSV dosyasında geçerli işlem satırı bulunamadı${skipped ? ` (${skipped} satır atlandı)` : ''}.`, 'error');
         return;
       }
+      // Dışa aktarılan dosyadaki kimlikle daha önce eklenmiş işlemler tekrar eklenmez.
+      const knownIds = new Set(state.transactions.map((t) => t.id));
+      let added = 0;
+      let duplicates = 0;
       for (const t of importedTxs) {
-        addTransaction(state, t);
+        if (t.id && knownIds.has(t.id)) {
+          duplicates += 1;
+          continue;
+        }
+        const created = addTransaction(state, t);
+        if (created) {
+          knownIds.add(created.id);
+          added += 1;
+        }
       }
       persist();
       paint();
-      status(`${importedTxs.length} işlem CSV'den başarıyla içe aktarıldı.`);
+      const parts = [`${added} işlem içe aktarıldı`];
+      if (duplicates) parts.push(`${duplicates} zaten kayıtlı olduğu için atlandı`);
+      if (skipped) parts.push(`${skipped} satır geçersizdi`);
+      status(`${parts.join(', ')}.`);
     } catch {
       status('CSV dosyası okunamadı veya format uyumsuz.', 'error');
     }
@@ -1630,16 +1710,24 @@ if (els.importCsvInput) {
 
 // ---------- Yedek al / yükle / sıfırla ----------
 
-els.exportBtn.addEventListener('click', () => {
+els.exportBtn.addEventListener('click', async () => {
   const stamp = localTodayIso();
-  const blob = new Blob([serialize(state)], { type: 'application/json' });
+  // Fiş görselleri IndexedDB'de; yedeğe dahil etmezsek geri yüklemede kaybolurlar.
+  const receipts = {};
+  for (const t of state.transactions) {
+    if (!t.hasReceipt && !t.receiptImage) continue;
+    const img = t.receiptImage || (await getReceiptImage(t.id));
+    if (img) receipts[t.id] = img;
+  }
+  const blob = new Blob([serialize(state, receipts)], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
   link.href = url;
   link.download = `butce-defteri-${stamp}.json`;
   link.click();
   URL.revokeObjectURL(url);
-  status('Yedek indirildi. Bulut veya harici diskte de bir kopya tut.');
+  const count = Object.keys(receipts).length;
+  status(`Yedek indirildi${count ? ` (${count} fiş fotoğrafı dahil)` : ''}. Bulut veya harici diskte de bir kopya tut.`);
 });
 
 els.importBtn.addEventListener('click', () => els.importInput.click());
@@ -1648,20 +1736,59 @@ els.importInput.addEventListener('change', async () => {
   const file = els.importInput.files?.[0];
   els.importInput.value = '';
   if (!file) return;
-  try {
-    const parsed = JSON.parse(await file.text());
-    if (!parsed || typeof parsed !== 'object' || !Array.isArray(parsed.transactions)) {
-      throw new Error('şema uyuşmuyor');
-    }
-    const incoming = normalize(parsed);
-    Object.assign(state, incoming);
-    persist();
-    refreshCategorySelects();
-    paint();
-    status(`Yedek yüklendi · ${state.transactions.length} işlem.`);
-  } catch {
-    status('Dosya okunamadı: geçerli bir Bütçe Defteri yedeği değil.', 'error');
+  if (!window.confirm('Mevcut tüm veriler bu yedekteki verilerle değiştirilecek. Devam edilsin mi?')) {
+    status('Geri yükleme iptal edildi.');
+    return;
   }
+  let parsed = null;
+  try {
+    parsed = JSON.parse(await file.text());
+  } catch {
+    parsed = null;
+  }
+  // Doğrulama bitmeden mevcut veriye dokunulmaz.
+  if (!parsed || typeof parsed !== 'object' || !Array.isArray(parsed.transactions)) {
+    status('Dosya okunamadı: geçerli bir Bütçe Defteri yedeği değil.', 'error');
+    return;
+  }
+
+  const incoming = normalize(parsed);
+  const incomingReceipts = parsed.receipts && typeof parsed.receipts === 'object' ? parsed.receipts : {};
+  // Yanlış yedek seçildiyse önceki durum elle kurtarılabilsin diye bir kopya bırak.
+  keepPreImportSnapshot(state);
+
+  // Durum tek senkron adımda değişir (aralarda await yok): yarım durum gözlenmez.
+  // Eski anahtarlar (ör. currencyLastUpdated) yeni yedekte yoksa kalmasın diye sıfırdan kurulur.
+  for (const key of Object.keys(state)) delete state[key];
+  Object.assign(state, incoming);
+
+  const keepIds = [];
+  let receiptProblems = 0;
+  for (const t of state.transactions) {
+    const img = incomingReceipts[t.id] || t.receiptImage;
+    if (typeof img === 'string' && img.startsWith('data:image/')) {
+      const saved = await saveReceiptImage(t.id, img);
+      t.hasReceipt = true;
+      if (saved) {
+        t.receiptImage = null;
+      } else {
+        // Kayıt başarısızsa görsel state'te kalır; kaybolmaz, kullanıcı uyarılır.
+        t.receiptImage = img;
+        receiptProblems += 1;
+      }
+    } else if (t.hasReceipt) {
+      t.hasReceipt = Boolean(await getReceiptImage(t.id));
+      if (!t.hasReceipt) receiptProblems += 1;
+    }
+    keepIds.push(t.id);
+  }
+  await pruneReceiptImages(keepIds);
+
+  persist();
+  refreshCategorySelects();
+  paint();
+  const warning = receiptProblems ? `, ${receiptProblems} fiş görselinde sorun var` : '';
+  status(`Yedek yüklendi · ${state.transactions.length} işlem${warning}.`, receiptProblems ? 'error' : 'info');
 });
 
 els.resetBtn.addEventListener('click', () => {
@@ -1670,7 +1797,7 @@ els.resetBtn.addEventListener('click', () => {
   els.resetConfirm.querySelector('[data-action="reset-yes"]').focus();
 });
 
-els.resetConfirm.addEventListener('click', (event) => {
+els.resetConfirm.addEventListener('click', async (event) => {
   const action = event.target.closest('[data-action]')?.dataset.action;
   if (!action) return;
   if (action === 'reset-yes') {
@@ -1681,6 +1808,7 @@ els.resetConfirm.addEventListener('click', (event) => {
     state.installments = [];
     state.budgets = {};
     state.materialized = {};
+    await pruneReceiptImages([]);
     persist();
     refreshCategorySelects();
     paint();

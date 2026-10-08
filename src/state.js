@@ -152,7 +152,7 @@ function normalizeRecurring(r) {
   if (typeof r.categoryId !== 'string' || !r.categoryId) return null;
   if (!Number.isInteger(day) || day < 1 || day > 28) return null; // 28: her ayda güvenli gün
   const frequency = ['monthly', 'weekly', 'yearly'].includes(r.frequency) ? r.frequency : 'monthly';
-  const month = frequency === 'yearly' && Number.isInteger(Number(r.month)) && Number(r.month) >= 1 && Number(r.month) <= 12 ? Number(r.month) : (r.month || 1);
+  const month = frequency === 'yearly' && Number.isInteger(Number(r.month)) && Number(r.month) >= 1 && Number(r.month) <= 12 ? Number(r.month) : 1;
   return {
     id: typeof r.id === 'string' && r.id ? r.id : uid(),
     name: typeof r.name === 'string' && r.name ? r.name : 'Tekrarlayan işlem',
@@ -213,6 +213,10 @@ export function normalize(input) {
     }
   }
 
+  const currencyLastUpdated = typeof input.currencyLastUpdated === 'string' && !Number.isNaN(Date.parse(input.currencyLastUpdated))
+    ? input.currencyLastUpdated
+    : null;
+
   return {
     schema: SCHEMA,
     transactions,
@@ -223,14 +227,71 @@ export function normalize(input) {
     currencies,
     budgets,
     materialized,
+    ...(currencyLastUpdated ? { currencyLastUpdated } : {}),
     createdAt: typeof input.createdAt === 'string' ? input.createdAt : base.createdAt,
     updatedAt: typeof input.updatedAt === 'string' ? input.updatedAt : base.updatedAt,
   };
 }
 
+// Bozuk veya şemaya uymayan kayıtlar yüklemede atılır; bu sırada ham veri
+// tek bir yedek anahtarında saklanır ki bir sonraki kayıt onu sessizce silmesin.
+export const RAW_BACKUP_KEY = 'butceDefteri.v1.rawBackup';
+// Geri yüklemeden hemen önceki kayıt; yanlış bir yedek seçilirse elle kurtarma için.
+export const PRE_IMPORT_KEY = 'butceDefteri.v1.beforeImport';
+
+let recoveredThisLoad = false;
+
+function keepRawBackup(raw) {
+  recoveredThisLoad = true;
+  try {
+    // Önceki ham kopya varsa üzerine yazılmaz: ilk bozulmanın içeriği en değerli olanıdır.
+    const storage = getStorage();
+    if (storage.getItem(RAW_BACKUP_KEY) === null) storage.setItem(RAW_BACKUP_KEY, raw);
+  } catch {}
+}
+
+/** Bu oturumda yüklemede kayıt kurtarıldı/atlandı mı? (uyarı göstermek için) */
+export function recoveredOnLoad() {
+  return recoveredThisLoad;
+}
+
+/** Geri yüklemeden önce mevcut durumu saklar. Başarısızlıkta false döner, işlem yine yapılabilir. */
+export function keepPreImportSnapshot(current) {
+  try {
+    getStorage().setItem(PRE_IMPORT_KEY, JSON.stringify(current));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function countDropped(parsed, state) {
+  const pairs = [
+    ['transactions', state.transactions],
+    ['recurring', state.recurring],
+    ['installments', state.installments],
+    ['goals', state.goals],
+    ['customCategories', state.customCategories],
+  ];
+  return pairs.reduce((sum, [key, kept]) => {
+    const incoming = Array.isArray(parsed[key]) ? parsed[key].length : 0;
+    return sum + (incoming - kept.length);
+  }, 0);
+}
+
 export function load() {
-  const parsed = parseJson(readRaw());
-  return parsed ? normalize(parsed) : emptyState();
+  const raw = readRaw();
+  if (!raw) return emptyState();
+
+  const parsed = parseJson(raw);
+  if (!parsed) {
+    keepRawBackup(raw);
+    return emptyState();
+  }
+
+  const state = normalize(parsed);
+  if (countDropped(parsed, state) > 0) keepRawBackup(raw);
+  return state;
 }
 
 /** Kayıt başarısız olursa (kota, özel mod) sessizce yutulmaz — çağıran haberdar edilir. */
@@ -247,7 +308,12 @@ export function save(state) {
 // ---------- İşlemler ----------
 
 export function addTransaction(state, input) {
-  const t = normalizeTransaction({ ...input, id: uid(), createdAt: nowIso() });
+  // Dışarıdan (CSV içe aktarma) gelen kimlik korunur; böylece tekrar içe aktarma çoğaltmaz.
+  const t = normalizeTransaction({
+    ...input,
+    id: typeof input.id === 'string' && input.id ? input.id : uid(),
+    createdAt: typeof input.createdAt === 'string' ? input.createdAt : nowIso(),
+  });
   if (!t) return null;
   state.transactions.push(t);
   return t;
@@ -311,68 +377,79 @@ export function setRecurringActive(state, id, active) {
  * `materialized[periodKey]` işlenen recurring id'lerini tutar.
  * Geriye yeni eklenen işlem sayısını döner.
  */
-export function materializeRecurring(state, periodKey) {
-  const done = new Set(state.materialized[periodKey] || []);
-  let added = 0;
-  const [y, m] = periodKey.split('-').map(Number);
+/**
+ * Tekrarlayan bir kalemin verilen aydaki gün numaraları.
+ * Aylık: r.day (ayın kısa olduğu durumda son güne kırpılır).
+ * Yıllık: yalnızca r.month ayında, r.day günü.
+ * Haftalık: 1-7 arası ilk gün, sonra her 7 günde bir, ay bitene kadar.
+ *   Eski kayıtlar (r.day > 7) da min(day, 7) ile işlendi; kural değişirse
+ *   geçmiş aylar yeniden işlenip mükerrer kayıt oluşur, bu yüzden değiştirilmedi.
+ */
+export function recurringDaysInPeriod(r, periodKeyStr) {
+  const [y, m] = periodKeyStr.split('-').map(Number);
   const lastDay = new Date(y, m, 0).getDate();
+  const freq = r.frequency || 'monthly';
+
+  if (freq === 'yearly') {
+    return m === (r.month || 1) ? [Math.min(r.day, lastDay)] : [];
+  }
+  if (freq === 'weekly') {
+    const days = [];
+    for (let d = Math.min(Math.max(1, r.day || 1), 7); d <= lastDay; d += 7) days.push(d);
+    return days;
+  }
+  return [Math.min(r.day, lastDay)];
+}
+
+function periodDate(periodKeyStr, day) {
+  return `${periodKeyStr}-${String(day).padStart(2, '0')}`;
+}
+
+function recurringNote(r, suffix) {
+  if (suffix) return `${r.name || ''}${r.note ? ' · ' + r.note : ''} (${suffix})`.trim();
+  return r.note || r.name || '';
+}
+
+export function materializeRecurring(state, periodKeyStr) {
+  const done = new Set(state.materialized[periodKeyStr] || []);
+  let added = 0;
 
   for (const r of state.recurring) {
     if (!r.active) continue;
     const freq = r.frequency || 'monthly';
+    const days = recurringDaysInPeriod(r, periodKeyStr);
 
-    if (freq === 'yearly') {
-      const targetMonth = r.month || 1;
-      if (m !== targetMonth || done.has(r.id)) continue;
-      const day = Math.min(r.day, lastDay);
-      const date = `${periodKey}-${String(day).padStart(2, '0')}`;
-      const noteLabel = `${r.name || ''}${r.note ? ' · ' + r.note : ''} (Yıllık)`.trim();
-      addTransaction(state, {
-        type: r.type,
-        amount: r.amount,
-        categoryId: r.categoryId,
-        date,
-        note: noteLabel,
-        recurringId: r.id,
-      });
-      done.add(r.id);
-      added += 1;
-    } else if (freq === 'weekly') {
-      const baseDay = Math.min(r.day || 1, 7);
-      for (let d = baseDay; d <= lastDay; d += 7) {
-        const date = `${periodKey}-${String(d).padStart(2, '0')}`;
+    if (freq === 'weekly') {
+      for (const d of days) {
+        const date = periodDate(periodKeyStr, d);
         const subId = `${r.id}_${date}`;
         if (done.has(subId)) continue;
-        const noteLabel = `${r.name || ''}${r.note ? ' · ' + r.note : ''} (Haftalık)`.trim();
         addTransaction(state, {
           type: r.type,
           amount: r.amount,
           categoryId: r.categoryId,
           date,
-          note: noteLabel,
+          note: recurringNote(r, 'Haftalık'),
           recurringId: r.id,
         });
         done.add(subId);
         added += 1;
       }
-      done.add(r.id);
     } else {
-      if (done.has(r.id)) continue;
-      const day = Math.min(r.day, lastDay);
-      const date = `${periodKey}-${String(day).padStart(2, '0')}`;
+      if (days.length === 0 || done.has(r.id)) continue;
       addTransaction(state, {
         type: r.type,
         amount: r.amount,
         categoryId: r.categoryId,
-        date,
-        note: r.note || r.name || '',
+        date: periodDate(periodKeyStr, days[0]),
+        note: freq === 'yearly' ? recurringNote(r, 'Yıllık') : recurringNote(r),
         recurringId: r.id,
       });
       done.add(r.id);
       added += 1;
     }
   }
-  if (added > 0) state.materialized[periodKey] = [...done];
+  if (added > 0) state.materialized[periodKeyStr] = [...done];
   return added;
 }
 
@@ -479,6 +556,28 @@ export function updateInstallment(state, id, updates) {
   return ins;
 }
 
+/** Taksit numarası `installmentNum` (1'den başlar) için tutar. Son taksit kuruş farkını üstlenir. */
+export function installmentAmountFor(ins, installmentNum) {
+  if (installmentNum < ins.totalInstallments) return ins.monthlyAmount;
+  return Number((ins.totalAmount - ins.monthlyAmount * (ins.totalInstallments - 1)).toFixed(2));
+}
+
+/** `paidCount` taksit ödendikten sonra kalan borç. */
+export function installmentRemainingAmount(ins, paidCount) {
+  if (paidCount >= ins.totalInstallments) return 0;
+  return Number((ins.totalAmount - paidCount * ins.monthlyAmount).toFixed(2));
+}
+
+/** Verilen aydaki taksit ödeme günü; o ay taksit yoksa veya plan pasifse null. */
+export function installmentDueDay(ins, periodKeyStr) {
+  if (!ins.active) return null;
+  const [startY, startM] = ins.startPeriod.split('-').map(Number);
+  const [curY, curM] = periodKeyStr.split('-').map(Number);
+  const monthDiff = (curY - startY) * 12 + (curM - startM);
+  if (monthDiff < 0 || monthDiff >= ins.totalInstallments) return null;
+  return Math.min(ins.dueDay || 1, 28);
+}
+
 /**
  * Bir ay için tanımlı aktif taksitleri o aya işler.
  */
@@ -489,26 +588,22 @@ export function materializeInstallments(state, periodKeyStr) {
 
   for (const ins of state.installments) {
     if (!ins.active || done.has(ins.id)) continue;
+    const day = installmentDueDay(ins, periodKeyStr);
+    if (day === null) continue;
 
-    // Başlangıç ve bitiş ayları aralığını kontrol et
     const [startY, startM] = ins.startPeriod.split('-').map(Number);
     const [curY, curM] = periodKeyStr.split('-').map(Number);
-    const monthDiff = (curY - startY) * 12 + (curM - startM);
-
-    if (monthDiff >= 0 && monthDiff < ins.totalInstallments) {
-      const installmentNum = monthDiff + 1;
-      const day = Math.min(ins.dueDay || 1, 28);
-      addTransaction(state, {
-        type: 'expense',
-        amount: ins.monthlyAmount,
-        categoryId: ins.categoryId,
-        date: `${periodKeyStr}-${String(day).padStart(2, '0')}`,
-        note: `${ins.name} (Taksit ${installmentNum}/${ins.totalInstallments})`,
-        installmentId: ins.id,
-      });
-      done.add(ins.id);
-      added += 1;
-    }
+    const installmentNum = (curY - startY) * 12 + (curM - startM) + 1;
+    addTransaction(state, {
+      type: 'expense',
+      amount: installmentAmountFor(ins, installmentNum),
+      categoryId: ins.categoryId,
+      date: `${periodKeyStr}-${String(day).padStart(2, '0')}`,
+      note: `${ins.name} (Taksit ${installmentNum}/${ins.totalInstallments})`,
+      installmentId: ins.id,
+    });
+    done.add(ins.id);
+    added += 1;
   }
 
   if (added > 0) state.materialized[periodKeyStr] = [...done];
@@ -549,59 +644,14 @@ export function convertToTRY(amount, currencyCode, state) {
   return Number((num * rate).toFixed(2));
 }
 
-// ---------- PIN Kodu / Kilit ----------
-
-const PIN_STORAGE_KEY = 'butceDefteri.pinHash';
-
-export function hasPin() {
-  try {
-    return Boolean(getStorage().getItem(PIN_STORAGE_KEY));
-  } catch {
-    return false;
-  }
-}
-
-export function setPin(pin) {
-  try {
-    if (!pin || pin.length < 4) return false;
-    let hash = 0;
-    for (let i = 0; i < pin.length; i += 1) {
-      hash = (hash << 5) - hash + pin.charCodeAt(i);
-      hash |= 0;
-    }
-    getStorage().setItem(PIN_STORAGE_KEY, String(hash));
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-export function verifyPin(pin) {
-  try {
-    const saved = getStorage().getItem(PIN_STORAGE_KEY);
-    if (!saved) return true;
-    let hash = 0;
-    for (let i = 0; i < pin.length; i += 1) {
-      hash = (hash << 5) - hash + pin.charCodeAt(i);
-      hash |= 0;
-    }
-    return String(hash) === saved;
-  } catch {
-    return false;
-  }
-}
-
-export function removePin() {
-  try {
-    getStorage().removeItem(PIN_STORAGE_KEY);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-export function serialize(state) {
-  return JSON.stringify({ ...state, schema: SCHEMA, exportedAt: nowIso() }, null, 2);
+/**
+ * Yedek dosyası. `receipts` ({ [transactionId]: dataUrl }) fiş görsellerini IndexedDB'den
+ * alınıp eklenir; yoksa yedek yalnızca state'i içerir.
+ */
+export function serialize(state, receipts = {}) {
+  const payload = { ...state, schema: SCHEMA, exportedAt: nowIso() };
+  if (receipts && Object.keys(receipts).length > 0) payload.receipts = receipts;
+  return JSON.stringify(payload, null, 2);
 }
 
 export function periodKey(date = new Date()) {
