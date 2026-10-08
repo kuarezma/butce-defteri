@@ -1053,6 +1053,7 @@ select:focus {
 }
 
 .confirm[hidden] { display: none; }
+#raw-backup-btn[hidden] { display: none; }
 
 .status {
   font-size: 0.88rem;

@@ -176,7 +176,8 @@ Bu araç kişisel takip amaçlıdır; muhasebe veya vergi beyanı yerine geçmez
 - 🔁 **Yıllık tekrarlayan:** Ödeme ayı seçilebilir (önceden her zaman Ocak'a düşüyordu). Haftalık kalemde gün 1–7 arasıdır; her 7 günde bir işlenir (eski kayıtlar aynı şekilde devam eder).
 - 🔐 **PIN:** PBKDF2 ile tuzlu hash (eski PIN'ler ilk doğru girişte yeni formata geçer); 5 hatalı denemede geçici kilit. Biyometrik kayıt, credential ID'yi saklar ve yalnızca o kimlikle açar.
 - 💾 **Yedek:** Fiş fotoğrafları dahil edilir. Geri yükleme onay ister, doğrulama bitmeden mevcut veriye dokunmaz ve yetim fiş görsellerini temizler. Fiş görseli kaydedilemezse görsel kaybolmaz, uyarı verilir. "Sıfırla" fiş görsellerini de siler. Geri yüklemeden önceki durum `butceDefteri.v1.beforeImport` anahtarında bir kez saklanır (arayüzde geri alma düğmesi yok).
-- 🗃️ **Veri koruma:** Bozuk veya atlanan kayıtların ham hali `butceDefteri.v1.rawBackup` içinde saklanır; mevcut bir ham kopya üzerine yazılmaz. Kur zaman damgası yeniden açılışta korunur.
+- 🗃️ **Veri koruma:** Bozuk veya atlanan kayıtların ham hali `butceDefteri.v1.rawBackup` içinde saklanır; mevcut bir ham kopya üzerine yazılmaz. Kopya varsa Araçlar sekmesinde "Ham Kopyayı İndir (Kurtarma)" düğmesi görünür; indirilen dosya JSON Yükle ile geri yüklenebilir. Kur zaman damgası yeniden açılışta korunur.
+- 🔔 **Gizlilik ve bildirim:** Gizlilik modu açıksa bildirim gövdesinde ad ve tutar yazılmaz (kilit ekranında görünebileceği için).
 - 🛡️ **Silme:** İşlem, taksit, hedef ve tekrarlayan silmede onay istenir. Kullanımda olan özel kategori silinmez.
 - 🧪 **CI:** Deploy öncesi `npm test` çalışır.
 

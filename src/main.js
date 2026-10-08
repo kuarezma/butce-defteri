@@ -6,7 +6,7 @@ import {
   addInstallment, removeInstallment, materializeInstallments, setCurrencyRate, setCurrencyRates, convertToTRY,
   setBudget, addCustomCategory, removeCustomCategory,
   addGoal, removeGoal, updateGoal, contributeToGoal,
-  recoveredOnLoad, keepPreImportSnapshot,
+  recoveredOnLoad, keepPreImportSnapshot, getRawBackup,
   periodKey, shiftPeriod,
 } from './state.js';
 import { hasPin, setPin, verifyPin, removePin, pinLockRemainingMs } from './pin.js';
@@ -53,9 +53,6 @@ migrateReceiptsToIndexedDb(state).then((count) => {
   if (count > 0) save(state);
 });
 
-// Yaklaşan ödeme bildirimlerini kontrol et
-checkUpcomingReminders(state);
-
 // Tarayıcının depolamayı kendiliğinden silmemesi için kalıcılık iste (destekleniyorsa)
 navigator.storage?.persist?.();
 
@@ -89,6 +86,9 @@ let privacyActive = localStorage.getItem(PRIVACY_KEY) === 'true';
 
 setPrivacyMode(privacyActive);
 applyTheme(currentTheme);
+
+// Yaklaşan ödeme bildirimleri; gizlilik modu açıksa bildirimde ad ve tutar yazılmaz
+checkUpcomingReminders(state, new Date(), { hideAmounts: isPrivacyMode() });
 
 function applyTheme(theme) {
   currentTheme = theme;
@@ -1131,7 +1131,7 @@ if (notifBtn) {
     updateNotifStatus();
     if (granted) {
       status('Bildirim izni verildi! Yaklaşan ödemeler hatırlatılacak.');
-      checkUpcomingReminders(state);
+      checkUpcomingReminders(state, new Date(), { hideAmounts: isPrivacyMode() });
     } else {
       status('Bildirim izni alınamadı veya reddedildi.', 'error');
     }
@@ -1729,6 +1729,22 @@ els.exportBtn.addEventListener('click', async () => {
   const count = Object.keys(receipts).length;
   status(`Yedek indirildi${count ? ` (${count} fiş fotoğrafı dahil)` : ''}. Bulut veya harici diskte de bir kopya tut.`);
 });
+
+// Kurtarılamayan ham kopya varsa indirilebilir; JSON Yükle ile geri yüklenebilecek biçimdedir.
+const rawBackupBtn = document.getElementById('raw-backup-btn');
+if (rawBackupBtn && getRawBackup() !== null) {
+  rawBackupBtn.hidden = false;
+  rawBackupBtn.addEventListener('click', () => {
+    const blob = new Blob([getRawBackup()], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `butce-defteri-ham-kopya-${localTodayIso()}.json`;
+    link.click();
+    URL.revokeObjectURL(url);
+    status('Ham kopya indirildi. Bozuk veya atlanan kayıtlar bu dosyada duruyor.');
+  });
+}
 
 els.importBtn.addEventListener('click', () => els.importInput.click());
 
